@@ -12,7 +12,7 @@ Ensure that your Crow Runner IP module is running the correct firmware.
 - Not having ANY SSH connection active to that IP Module (Firmware support just a single connection ) to SSH port 5002.
 - WebUi can be reached with IP adress that is given in the first Bootup via DHCP Server.
 - Set the IP adress to static in order to keep a fixed IP adress at any time.
-- Running Home Assistant higher then release 2024.01.0 (lower once mayowrk but are not support):
+- Running Home Assistant higher then release 2024.08.0 (lower once mayowrk but are not support):
 
 An setup example is given below: (config_flow setup is in progress)
 
@@ -95,9 +95,9 @@ crowipmodule:
 ```
 Changelog
 
-V2024.01:
+V2024.08:
 - config_flow adjustments
-- min req. HA 2024.01.2
+- min req. HA 2024.08.0
 - pycrowipmodule set to 0.28 in order to avoid the issues with binary_sensors not updated.
 
 V2023.08: 
