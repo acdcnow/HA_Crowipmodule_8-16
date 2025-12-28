@@ -8,7 +8,7 @@ CONF_AREAS = "areas"
 CONF_ZONES = "zones"
 CONF_OUTPUTS = "outputs"
 
-# Dynamic Configuration Keys for Counts
+# Dynamic Configuration Keys
 CONF_NUM_AREAS = "number_of_areas"
 CONF_NUM_ZONES = "number_of_zones"
 
@@ -16,7 +16,7 @@ CONF_NUM_ZONES = "number_of_zones"
 MAX_AREAS = 2
 MAX_ZONES = 16 
 DEFAULT_NUM_AREAS = 2
-DEFAULT_NUM_ZONES = 8
+DEFAULT_NUM_ZONES = 7
 
 # Defaults
 DEFAULT_PORT = 5002
