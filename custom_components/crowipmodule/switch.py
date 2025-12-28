@@ -28,7 +28,6 @@ async def async_setup_entry(
     host = entry.data[CONF_HOST]
     
     entities = []
-
     configured_outputs = options.get(CONF_OUTPUTS, {})
 
     if not configured_outputs:
