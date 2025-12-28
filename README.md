@@ -1,105 +1,96 @@
 # Crow/AAP Alarm IP Module for Home Assistant
 
-This is a custom component for Home Assistant to integrate **Crow Runner** and **AAP (Arrowhead Alarm Products)** alarm systems equipped with the **IP Module** (IA-IP-MODULE) running Firmware Ver 2.10.3628 2017 Oct 20 09:48:43.
-
-It communicates directly with the IP module over the local network to provide real-time status updates and control.
+This custom component integrates **Crow Runner** and **AAP (Arrowhead Alarm Products)** alarm systems into Home Assistant using the IP Module. It provides local, real-time feedback and control over your alarm system.
 
 ## ✨ Features
 
-* **Config Flow:** Fully configurable via the Home Assistant UI (no YAML required).
-* **Alarm Control Panel:** Arm (Away/Stay), Disarm, and Trigger panic alarms for up to 2 Areas (Partitions).
-* **Zones:** Binary sensors for up to 16 zones (Motion, Door, Window, Smoke, etc.).
-* **Outputs:** Control up to 2 switchable outputs (e.g., Garage Door, Gates).
-* **System Status:** Diagnostic sensors for Mains Power, Battery, Tamper, Phone Line, and Dialler status.
-* **Device Registry:** All entities are grouped under a single "Crow Alarm System" device.
+* **Alarm Control Panel:** Full support for Arm Away, Arm Home (Stay), and Disarm.
+* **Real-time Updates:** Instant feedback via local TCP connection (no cloud required).
+* **Multi-Area Support:** Supports up to 2 separate areas (Partitions A & B).
+* **Zone Monitoring:** Monitor up to 16 zones with configurable types (Motion, Window, Door, etc.).
+* **Output Control:** Control up to 2 outputs (e.g., for garage doors, gates, or lights).
+* **System Status:** Binary sensors for Mains Power, Battery Status, Tamper, Phone Line, and Dialer.
+* **Robust Connection:** Auto-reconnection logic and status synchronization upon Home Assistant restarts.
+* **Multilingual:** Fully translated into English, German, French, Italian, and Spanish.
 
-## 📋 Requirements
-
-* **Home Assistant:** Version 2025.12.3 or newer.
-* **Hardware:** Crow Runner or AAP control panel with an installed IP Module.
-* **Network:** The IP Module must be connected to the same network as Home Assistant.
+---
 
 ## 🚀 Installation
 
 ### Option 1: HACS (Recommended)
-
-1. Open HACS in Home Assistant.
-2. Go to "Integrations" > Top right menu > "Custom repositories".
-3. Add the URL of this repository.
-4. Category: **Integration**.
-5. Click **Install**.
-6. Restart Home Assistant.
+1.  Open HACS in Home Assistant.
+2.  Go to "Integrations" > "Custom repositories".
+3.  Add the URL of this repository and select **Integration** as the category.
+4.  Click "Install".
+5.  Restart Home Assistant.
 
 ### Option 2: Manual Installation
+1.  Download the `custom_components/crowipmodule` folder from this repository.
+2.  Copy the folder into your Home Assistant's `config/custom_components/` directory.
+3.  Restart Home Assistant.
 
-1. Download this repository.
-2. Copy the `custom_components/crowipmodule` folder into your Home Assistant's `config/custom_components/` directory.
-3. Restart Home Assistant.
+---
 
 ## ⚙️ Configuration
 
-This integration uses a 4-step configuration wizard.
+Once installed, the integration is configured via the Home Assistant UI (**Settings** -> **Devices & Services** -> **Add Integration** -> **Crow/AAP Alarm IP Module**).
 
-1. Go to **Settings** > **Devices & Services**.
-2. Click **+ Add Integration**.
-3. Search for **Crow/AAP Alarm IP Module**.
-
-### The Setup Wizard
-
-* **Step 1: Areas**
-* Name your partitions (e.g., "House", "Garage").
-* (Optional) Enter a default code if you want to arm/disarm without typing it every time.
-
-
-* **Step 2: Switches (Outputs)**
-* Name your controllable outputs (Output 3 & 4), e.g., "Garage Door".
-
-
-* **Step 3: Zones**
-* Name your 16 zones.
-* Select the type for each zone (Motion, Door, Window, Smoke, etc.) from the dropdown.
-* *Tip: Leave unused zones empty.*
-
-
-* **Step 4: Connection**
-* **IP Address:** The local IP of your alarm module.
+### 1. Connection Settings
+* **Host:** The IP address of your Crow IP Module.
 * **Port:** Usually `5002`.
+* **Keepalive:** Time in seconds to check connection health (Default: 60s).
+* **Timeout:** Connection timeout (Default: 10s).
 
+### 2. Device Quantities
+You will be asked to define how many devices you have.
+* **Number of Areas:** 1 or 2.
+* **Number of Zones:** 1 to 16.
 
+### 3. Naming & Setup
+The configuration flow is paginated to keep the UI clean:
+* **Areas:** Name your areas (e.g., "House", "Garage") and optionally set a PIN code.
+* **Outputs:** Name your 2 switchable outputs.
+* **Zones:** You will configure your zones in blocks of 4 per page. You can set the **Name** and the **Type** for each zone.
 
-### Migration from YAML
+#### Available Zone Types:
+* `window` (Default)
+* `door`
+* `motion`
+* `smoke`
+* `gas`
+* `co` (Carbon Monoxide)
+* `tamper`
+* `safety`
 
-If you previously used the YAML configuration, the integration will automatically import your settings (Zones, Areas, IP) upon the first restart. Once the device appears in the "Integrations" dashboard, you can safely remove the `crowipmodule:` section from your `configuration.yaml`.
+---
 
-## 🛡️ Usage
+## 🎮 Usage
 
-### Alarm Panel
+### Alarm Control Panel
+Two entities will be created (if 2 areas are selected), typically `alarm_control_panel.area_1` and `alarm_control_panel.area_2`.
 
-* **Arming:** Click "Arm Away" or "Arm Home". If a code is required and not saved in the config, the keypad will appear.
-* **Disarming:** Enter your code on the keypad and click "Disarm".
-* **Keypad:** The keypad is always available to send manual commands or codes.
+* **Arm Away:** Activates the full alarm system.
+* **Arm Home (Stay):** Activates the "Stay" mode (usually perimeter protection only).
+* **Disarm:** Deactivates the alarm. Requires the user code configured in the panel or the integration settings.
+* **Trigger:** Activates the Panic alarm.
 
-### Diagnostic Sensors
+### Switches (Outputs)
+The integration creates exactly **2 switches** (`switch.output_1` and `switch.output_2`).
+* These correspond to the controllable outputs on the alarm board.
+* Often used for opening gates or triggering external sirens manually.
 
-System health information is located on the Device page under the **Diagnostic** category. These sensors indicate problems (e.g., "Low Battery" or "Power Failure").
+### Sensors
+* **Binary Sensors:** Provide status for `Mains Power` (Connectivity), `System Battery`, `Tamper` (Sabotage), etc.
+    * *Note:* Tamper shows `On` if sabotage is detected. Battery shows `On` if the battery is Low.
+* **Text Sensor:** A diagnostic sensor showing the raw system status text (e.g., "Ready", "Power Failure").
 
-* `Mains Power` (On = Power OK)
-* `System Battery` (On = Battery Low)
-* `System Tamper` (On = Tamper Detected)
+---
 
-### Outputs
+## 🐛 Debugging & Logging
 
-Outputs 1 & 2 are usually hardware relays on the board. Outputs 3 & 4 are the controllable switches configured during setup. They appear as standard Switch entities in Home Assistant.
+If you encounter issues or want to see the raw data coming from the alarm panel, you can enable debug logging.
 
-Here is a detailed **CHANGELOG** summarizing the refactoring from the original YAML-based code to the new Home Assistant 2025-compliant integration.
-
-
-## 🔧 Troubleshooting
-
-**Enable Debug Logging:**
-If you encounter issues, enable debug logging to see the raw communication with the module.
-
-Add this to your `configuration.yaml`:
+Add the following to your `configuration.yaml`:
 
 ```yaml
 logger:
@@ -107,16 +98,3 @@ logger:
   logs:
     custom_components.crowipmodule: debug
     pycrowipmodule: debug
-
-```
-
-**Common Errors:**
-
-* `Bootstrap stage 2 timeout`: The integration couldn't connect to the IP during startup. It will keep trying in the background. Check your IP address.
-* `500 Internal Server Error`: Ensure you cleared your browser cache (CTRL+F5) after updating the integration.
-
-## Credits
-
-Based on the `pycrowipmodule` library.
-Original custom component author: @febalci.
-Refactored for Home Assistant 2025+ with Config Flow support.
