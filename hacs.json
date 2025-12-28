@@ -1,12 +1,11 @@
 {
   "name": "Crow/AAP Alarm IP Module",
+  "content_in_root": false,
+  "zip_release": false,
   "render_readme": true,
-  "homeassistant": "2025.12.3",
+  "homeassistant": "2025.12.4",
   "iot_class": "local_push",
   "domains": [
-    "alarm_control_panel",
-    "binary_sensor",
-    "sensor",
-    "switch"
+    "crowipmodule"
   ]
 }
