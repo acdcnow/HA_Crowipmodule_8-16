@@ -25,8 +25,9 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Set "window" as the first element to make it default if not specified otherwise logic
 ZONE_TYPES = [
-    "motion", "door", "window", "smoke", "gas", "co", "tamper", "safety"
+    "window", "motion", "door", "smoke", "gas", "co", "tamper", "safety"
 ]
 
 PAGE_SIZE = 4
@@ -42,6 +43,7 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._zone_page = 0
 
     async def async_step_user(self, user_input=None):
+        """Step 1: Connection details and counts."""
         errors = {}
         if user_input is not None:
             _LOGGER.info("User started config flow setup.")
@@ -68,6 +70,7 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_areas(self, user_input=None):
+        """Step 2: Configure Areas."""
         count = self._data.get(CONF_NUM_AREAS, DEFAULT_NUM_AREAS)
         
         if user_input is not None:
@@ -89,6 +92,7 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="areas", data_schema=vol.Schema(schema))
 
     async def async_step_outputs(self, user_input=None):
+        """Step 3: Configure Outputs."""
         if user_input is not None:
             outputs_config = {}
             for i in range(1, 3):
@@ -108,6 +112,7 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="outputs", data_schema=vol.Schema(schema))
 
     async def async_step_zones(self, user_input=None):
+        """Step 4: Configure Zones (Paginated)."""
         count = self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)
         
         if user_input is not None:
@@ -135,12 +140,14 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         end_idx = min(start_idx + PAGE_SIZE - 1, count)
         schema = {}
         for i in range(start_idx, end_idx + 1):
+            # Default to 'window' if new
             schema[vol.Optional(f"zone_{i}_name")] = str
-            schema[vol.Optional(f"zone_{i}_type", default="motion")] = vol.In(ZONE_TYPES)
+            schema[vol.Optional(f"zone_{i}_type", default="window")] = vol.In(ZONE_TYPES)
 
         return self.async_show_form(step_id="zones", data_schema=vol.Schema(schema))
 
     async def async_step_import(self, import_data):
+        """Handle import from YAML."""
         data = {
             CONF_HOST: import_data.get(CONF_HOST),
             CONF_PORT: import_data.get(CONF_PORT, DEFAULT_PORT),
@@ -184,9 +191,16 @@ class CrowOptionsFlowHandler(config_entries.OptionsFlow):
             return await self.async_step_areas()
 
         data = self._config_entry.data
-        c_areas = data.get(CONF_NUM_AREAS, DEFAULT_NUM_AREAS)
-        c_zones = data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)
+        options = self._config_entry.options
         
+        # Load existing counts to pre-fill
+        c_areas = data.get(CONF_NUM_AREAS, len(options.get(CONF_AREAS, {})) or DEFAULT_NUM_AREAS)
+        c_zones = data.get(CONF_NUM_ZONES, len(options.get(CONF_ZONES, {})) or DEFAULT_NUM_ZONES)
+        
+        # Ensure minimums
+        c_areas = max(1, min(c_areas, MAX_AREAS))
+        c_zones = max(1, min(c_zones, MAX_ZONES))
+
         schema = vol.Schema({
             vol.Required(CONF_HOST, default=data.get(CONF_HOST)): str,
             vol.Optional(CONF_PORT, default=data.get(CONF_PORT, DEFAULT_PORT)): int,
@@ -271,7 +285,10 @@ class CrowOptionsFlowHandler(config_entries.OptionsFlow):
         schema = {}
         for i in range(start_idx, end_idx + 1):
             d = existing_zones.get(str(i), {})
-            schema[vol.Optional(f"zone_{i}_name", description={"suggested_value": d.get("name", "")})] = str
-            schema[vol.Optional(f"zone_{i}_type", default=d.get("type", "motion"))] = vol.In(ZONE_TYPES)
+            current_name = d.get("name", "")
+            current_type = d.get("type", "window") # Set default window here as well if not set
+            
+            schema[vol.Optional(f"zone_{i}_name", description={"suggested_value": current_name})] = str
+            schema[vol.Optional(f"zone_{i}_type", default=current_type)] = vol.In(ZONE_TYPES)
 
         return self.async_show_form(step_id="zones", data_schema=vol.Schema(schema))
