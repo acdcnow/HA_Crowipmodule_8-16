@@ -5,18 +5,16 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.const import CONF_HOST, EntityCategory # Für Diagnostik, falls wir den Text-Sensor auch so wollen
+from homeassistant.const import CONF_HOST
 
 from .const import (
     DOMAIN,
-    DATA_CRW,
     SIGNAL_SYSTEM_UPDATE,
 )
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -27,6 +25,7 @@ async def async_setup_entry(
     controller = hass.data[DOMAIN][entry.entry_id]
     host = entry.data[CONF_HOST]
     
+    _LOGGER.info("Setting up Crow System Status Text Sensor for %s", host)
     async_add_entities([CrowSystemSensor(controller, host)], True)
 
 
@@ -41,6 +40,9 @@ class CrowSystemSensor(SensorEntity):
         self._attr_name = "System Status"
         self._attr_unique_id = "crow_system_status_text"
         self._attr_icon = "mdi:shield-home"
+        
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        
         self._info = controller.system_state
 
     @property
@@ -64,6 +66,9 @@ class CrowSystemSensor(SensorEntity):
         """Return a text representation of the state."""
         status = self._info.get("status", {})
         
+        if not status:
+            return "Ready"
+        
         if status.get("alarm"):
             return "ALARM"
         if status.get("armed"):
@@ -74,14 +79,13 @@ class CrowSystemSensor(SensorEntity):
             return "Exit Delay"
         if status.get("stay_exit_delay"):
             return "Stay Exit Delay"
+            
         if not status.get("mains", True):
             return "Power Failure"
         if not status.get("battery", True):
             return "Low Battery"
             
         return "Ready"
-
-    # extra_state_attributes wurde ENTFERNT.
 
     @callback
     def _update_callback(self, system) -> None:
