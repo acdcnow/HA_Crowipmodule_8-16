@@ -1,0 +1,110 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Connexion et Quantités",
+                "description": "Entrez l'adresse IP et le nombre de périphériques.",
+                "data": {
+                    "host": "Adresse IP",
+                    "port": "Port",
+                    "number_of_areas": "Nombre de secteurs (1-2)",
+                    "number_of_zones": "Nombre de zones (1-16)",
+                    "keepalive_interval": "Intervalle de maintien (s)",
+                    "timeout": "Délai d'attente (s)"
+                }
+            },
+            "areas": {
+                "title": "Configurer les Secteurs",
+                "description": "Nommez vos secteurs d'alarme.",
+                "data": {
+                    "area_1_name": "Nom Secteur 1", "area_1_code": "Code Secteur 1",
+                    "area_2_name": "Nom Secteur 2", "area_2_code": "Code Secteur 2"
+                }
+            },
+            "outputs": {
+                "title": "Configurer les Sorties",
+                "description": "Nommez vos sorties commutables.",
+                "data": {
+                    "output_1_name": "Nom Sortie 1", 
+                    "output_2_name": "Nom Sortie 2"
+                }
+            },
+            "zones": {
+                "title": "Configurer les Zones",
+                "description": "Nommez vos capteurs et sélectionnez leur type (4 par page).",
+                "data": {
+                    "zone_1_name": "Nom Zone 1", "zone_1_type": "Type Zone 1",
+                    "zone_2_name": "Nom Zone 2", "zone_2_type": "Type Zone 2",
+                    "zone_3_name": "Nom Zone 3", "zone_3_type": "Type Zone 3",
+                    "zone_4_name": "Nom Zone 4", "zone_4_type": "Type Zone 4",
+                    "zone_5_name": "Nom Zone 5", "zone_5_type": "Type Zone 5",
+                    "zone_6_name": "Nom Zone 6", "zone_6_type": "Type Zone 6",
+                    "zone_7_name": "Nom Zone 7", "zone_7_type": "Type Zone 7",
+                    "zone_8_name": "Nom Zone 8", "zone_8_type": "Type Zone 8",
+                    "zone_9_name": "Nom Zone 9", "zone_9_type": "Type Zone 9",
+                    "zone_10_name": "Nom Zone 10", "zone_10_type": "Type Zone 10",
+                    "zone_11_name": "Nom Zone 11", "zone_11_type": "Type Zone 11",
+                    "zone_12_name": "Nom Zone 12", "zone_12_type": "Type Zone 12",
+                    "zone_13_name": "Nom Zone 13", "zone_13_type": "Type Zone 13",
+                    "zone_14_name": "Nom Zone 14", "zone_14_type": "Type Zone 14",
+                    "zone_15_name": "Nom Zone 15", "zone_15_type": "Type Zone 15",
+                    "zone_16_name": "Nom Zone 16", "zone_16_type": "Type Zone 16"
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Paramètres Généraux",
+                "description": "Modifier l'IP ou le nombre d'appareils.",
+                "data": {
+                    "host": "Adresse IP",
+                    "port": "Port",
+                    "number_of_areas": "Nombre de secteurs",
+                    "number_of_zones": "Nombre de zones",
+                    "keepalive_interval": "Keepalive",
+                    "timeout": "Timeout"
+                }
+            },
+            "areas": { 
+                "title": "Mettre à jour les Secteurs",
+                "description": "Changer les noms et codes.",
+                "data": {
+                    "area_1_name": "Nom Secteur 1", "area_1_code": "Code Secteur 1",
+                    "area_2_name": "Nom Secteur 2", "area_2_code": "Code Secteur 2"
+                }
+            },
+            "outputs": { 
+                "title": "Mettre à jour les Sorties",
+                "description": "Changer les noms des sorties.",
+                "data": {
+                    "output_1_name": "Nom Sortie 1", 
+                    "output_2_name": "Nom Sortie 2"
+                }
+            },
+            "zones": { 
+                "title": "Mettre à jour les Zones",
+                "description": "Changer les noms et types des zones.",
+                "data": {
+                    "zone_1_name": "Nom Zone 1", "zone_1_type": "Type Zone 1",
+                    "zone_2_name": "Nom Zone 2", "zone_2_type": "Type Zone 2",
+                    "zone_3_name": "Nom Zone 3", "zone_3_type": "Type Zone 3",
+                    "zone_4_name": "Nom Zone 4", "zone_4_type": "Type Zone 4",
+                    "zone_5_name": "Nom Zone 5", "zone_5_type": "Type Zone 5",
+                    "zone_6_name": "Nom Zone 6", "zone_6_type": "Type Zone 6",
+                    "zone_7_name": "Nom Zone 7", "zone_7_type": "Type Zone 7",
+                    "zone_8_name": "Nom Zone 8", "zone_8_type": "Type Zone 8",
+                    "zone_9_name": "Nom Zone 9", "zone_9_type": "Type Zone 9",
+                    "zone_10_name": "Nom Zone 10", "zone_10_type": "Type Zone 10",
+                    "zone_11_name": "Nom Zone 11", "zone_11_type": "Type Zone 11",
+                    "zone_12_name": "Nom Zone 12", "zone_12_type": "Type Zone 12",
+                    "zone_13_name": "Nom Zone 13", "zone_13_type": "Type Zone 13",
+                    "zone_14_name": "Nom Zone 14", "zone_14_type": "Type Zone 14",
+                    "zone_15_name": "Nom Zone 15", "zone_15_type": "Type Zone 15",
+                    "zone_16_name": "Nom Zone 16", "zone_16_type": "Type Zone 16"
+                }
+            }
+        }
+    }
+}
