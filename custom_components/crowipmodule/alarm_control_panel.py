@@ -34,6 +34,7 @@ async def async_setup_entry(
     
     configured_areas = options.get(CONF_AREAS, {})
     
+    # Fallback if config is broken/missing
     if not configured_areas:
         configured_areas = {
             "1": {"name": "Area 1", "code": "", "code_arm_required": True},
@@ -95,6 +96,7 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
 
     @callback
     def _update_callback(self, area) -> None:
+        # If area is None (global update) or matches this area
         if area is None or area == self._area_number:
             if self._area_number_int in self._controller.area_state:
                 self._info = self._controller.area_state[self._area_number_int]
@@ -155,12 +157,24 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
+        """Return the state of the device."""
         status = self._info.get("status", {})
-        if status.get("alarm"): return AlarmControlPanelState.TRIGGERED
-        if status.get("armed"): return AlarmControlPanelState.ARMED_AWAY
-        if status.get("stay_armed"): return AlarmControlPanelState.ARMED_HOME
-        if status.get("exit_delay") or status.get("stay_exit_delay"): return AlarmControlPanelState.ARMING
-        if status.get("disarmed"): return AlarmControlPanelState.DISARMED
+        
+        # Priority order
+        if status.get("alarm"): 
+            return AlarmControlPanelState.TRIGGERED
+        if status.get("armed"): 
+            return AlarmControlPanelState.ARMED_AWAY
+        if status.get("stay_armed"): 
+            return AlarmControlPanelState.ARMED_HOME
+        if status.get("exit_delay") or status.get("stay_exit_delay"): 
+            return AlarmControlPanelState.ARMING
+        if status.get("disarmed"): 
+            return AlarmControlPanelState.DISARMED
+            
+        # Fallback: If we have an empty status dict (startup), but connection is theoretically there,
+        # we might want to return UNKNOWN or assume Disarmed if we trust the lack of flags.
+        # Returning None results in "Unknown".
         return None
     
     @property
