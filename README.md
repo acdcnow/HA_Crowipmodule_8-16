@@ -1,6 +1,6 @@
 # Crow/AAP Alarm IP Module for Home Assistant
 
-This custom component integrates **Crow Runner** and **AAP (Arrowhead Alarm Products)** alarm systems into Home Assistant using the IP Module. It provides local, real-time feedback and control over your alarm system.
+This is a custom component for Home Assistant to integrate **Crow Runner** alarm systems equipped with the **IP Module** (IA-IP-MODULE) running Firmware Ver 2.10.3628 2017 Oct 20 09:48:43.
 
 ## ✨ Features
 
