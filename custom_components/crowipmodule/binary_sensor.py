@@ -18,7 +18,6 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up the Crow binary sensors."""
     controller = hass.data[DOMAIN][entry.entry_id]
     options = entry.options
     host = entry.data[CONF_HOST]
@@ -29,10 +28,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     if not configured_zones:
         for i in range(1, 17):
-            configured_zones[str(i)] = {"name": f"Zone {i}", "type": "motion"}
+            configured_zones[str(i)] = {"name": f"Zone {i}", "type": "window"}
 
-    _LOGGER.info("Setting up %d Zone Sensors.", len(configured_zones))
-    
     for zone_num_str, zone_info in configured_zones.items():
         try:
             zone_num = int(zone_num_str)
@@ -121,23 +118,14 @@ class CrowSystemStatusSensor(CrowBaseEntity):
     @property
     def is_on(self):
         status = self._controller.system_state.get("status", {})
-        val = status.get(self._key, True) # Default to True (Often means 'Good' for system lines)
+        val = status.get(self._key, True) 
         
-        # 1. POWER & CONNECTIVITY:
-        # True = Connected/PowerOK -> ON in HA
         if self._attr_device_class in [BinarySensorDeviceClass.POWER, BinarySensorDeviceClass.CONNECTIVITY]:
             return val
             
-        # 2. BATTERY:
-        # True = Battery OK -> HA OFF (No Problem)
-        # False = Battery Low -> HA ON (Problem)
         if self._attr_device_class == BinarySensorDeviceClass.BATTERY:
             return not val 
 
-        # 3. TAMPER:
-        # True = Tamper Open/Alarm -> HA ON (Problem)
-        # False = Tamper Closed/OK -> HA OFF (No Problem)
-        # NO INVERSION NEEDED HERE based on user feedback
         if self._attr_device_class == BinarySensorDeviceClass.TAMPER:
             return val
 
