@@ -4,18 +4,15 @@ import logging
 import voluptuous as vol
 
 from pycrowipmodule import CrowIPAlarmPanel
-from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.const import (
     CONF_HOST, CONF_PORT, CONF_TIMEOUT, EVENT_HOMEASSISTANT_STOP, Platform
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-import homeassistant.helpers.config_validation as cv
 
 from .const import (
-    DOMAIN, DATA_CRW, CONF_KEEP_ALIVE,
-    CONF_AREAS, CONF_ZONES, CONF_OUTPUTS,
-    DEFAULT_PORT, DEFAULT_KEEPALIVE, DEFAULT_TIMEOUT,
+    DOMAIN, CONF_KEEP_ALIVE,
     SIGNAL_ZONE_UPDATE, SIGNAL_AREA_UPDATE, 
     SIGNAL_SYSTEM_UPDATE, SIGNAL_OUTPUT_UPDATE
 )
@@ -24,42 +21,35 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.ALARM_CONTROL_PANEL, Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 
-# Import Schema
-CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({}, extra=vol.ALLOW_EXTRA)}, extra=vol.ALLOW_EXTRA)
-
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the Crow IP Module component from YAML (Import)."""
+    """Set up the Crow IP Module component from YAML (legacy)."""
     hass.data.setdefault(DOMAIN, {})
-    if DOMAIN in config:
-        hass.async_create_task(
-            hass.config_entries.flow.async_init(
-                DOMAIN, context={"source": SOURCE_IMPORT}, data=config[DOMAIN]
-            )
-        )
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Crow IP Module from a config entry."""
+    _LOGGER.info("Starting Crow IP Module setup for entry: %s", entry.title)
     
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
     keep_alive = entry.data.get(CONF_KEEP_ALIVE, 60)
     connection_timeout = entry.data.get(CONF_TIMEOUT, 10)
     
-    # 1. Controller Init
-    # Wir übergeben keinen Loop, da pycrowipmodule (hoffentlich) den laufenden Loop nutzt oder Threads verwendet.
-    controller = CrowIPAlarmPanel(
-        host, port, "0000", keep_alive, None, connection_timeout
-    )
+    _LOGGER.debug("Init params: Host=%s, Port=%s, Timeout=%s, KeepAlive=%s", 
+                  host, port, connection_timeout, keep_alive)
+    
+    try:
+        controller = CrowIPAlarmPanel(
+            host, port, "0000", keep_alive, None, connection_timeout
+        )
+    except Exception as e:
+        _LOGGER.error("Failed to initialize CrowIPAlarmPanel object: %s", e)
+        return False
 
     hass.data[DOMAIN][entry.entry_id] = controller
 
-    # 2. Thread-Safe Callbacks
-    # WICHTIG: Da die Crow-Lib in einem eigenen Thread läuft, müssen wir
-    # updates Thread-Safe an den HA-Main-Loop übergeben.
-    
+    # Thread-safe Dispatchers
     def _thread_safe_send(signal, data):
-        """Helper to send dispatcher signals thread-safely."""
         hass.loop.call_soon_threadsafe(async_dispatcher_send, hass, signal, data)
 
     def zones_updated_callback(data):
@@ -75,12 +65,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _thread_safe_send(SIGNAL_OUTPUT_UPDATE, data)
 
     def connected_callback(data):
-        _LOGGER.info("Established a connection with the Crow Ip Module")
+        _LOGGER.info("Successfully connected to Crow IP Module at %s", host)
+        
+        # ASYNC REFRESH TASK
+        # This is crucial for BOTH Boot and Reload.
+        # When we connect, the memory is empty. The panel sends a dump.
+        # We wait 2s for the dump to arrive, then force all entities to read the new state.
+        async def delayed_initial_refresh():
+            _LOGGER.debug("Connection established. Waiting 2.0s for system status dump...")
+            await asyncio.sleep(2.0)
+            
+            _LOGGER.info("Processing initial system state (Force Refresh)...")
+            async_dispatcher_send(hass, SIGNAL_SYSTEM_UPDATE, None)
+            async_dispatcher_send(hass, SIGNAL_AREA_UPDATE, None)
+            async_dispatcher_send(hass, SIGNAL_ZONE_UPDATE, None)
+            async_dispatcher_send(hass, SIGNAL_OUTPUT_UPDATE, None)
+            _LOGGER.debug("Initial state refresh dispatched.")
+
+        # Schedule the task on the event loop so it doesn't block
+        hass.loop.create_task(delayed_initial_refresh())
 
     def connection_fail_callback(data):
-        _LOGGER.error("Could not establish a connection with the Crow Ip Module")
+        _LOGGER.warning("Connection lost to Crow IP Module at %s. Waiting for reconnect...", host)
 
-    # Callbacks registrieren
+    # Register callbacks
     controller.callback_zone_state_change = zones_updated_callback
     controller.callback_area_state_change = areas_updated_callback
     controller.callback_system_state_change = system_updated_callback
@@ -88,18 +96,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     controller.callback_connected = connected_callback
     controller.callback_login_timeout = connection_fail_callback
 
-    _LOGGER.info("Starting CrowIpModule background task...")
-    
-    # 3. Starten OHNE Blockieren (Fix für Timeout Fehler)
-    # Wir rufen .start() im Executor auf, warten aber NICHT darauf (kein await).
-    # Damit kann async_setup_entry sofort 'True' zurückgeben und HA bootet weiter,
-    # während der Controller im Hintergrund versucht sich zu verbinden.
-    hass.async_add_executor_job(controller.start)
+    # Wait for previous socket cleanup (prevents 'Unable to connect' on Reload)
+    # This delay happens before we even try to open the socket.
+    _LOGGER.debug("Waiting 2 seconds before starting connection thread to ensure socket cleanup...")
+    await asyncio.sleep(2.0)
 
-    # 4. Plattformen laden
+    _LOGGER.info("Starting CrowIpModule background thread...")
+    try:
+        hass.async_add_executor_job(controller.start)
+    except Exception as e:
+         _LOGGER.error("Fatal error starting controller thread: %s", e)
+         return False
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
-    # 5. Shutdown Listener
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, lambda event: controller.stop())
     )
@@ -108,10 +118,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    _LOGGER.info("Unloading Crow IP Module entry.")
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         controller = hass.data[DOMAIN][entry.entry_id]
-        # Stop auch im Executor ausführen, um Blocking zu vermeiden
+        _LOGGER.info("Stopping Crow IP Module connection...")
         await hass.async_add_executor_job(controller.stop)
         hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
