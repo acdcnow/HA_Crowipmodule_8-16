@@ -25,16 +25,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     entities = []
 
-    # 1. ZONEN (Fenster, Türen, Bewegung)
     configured_zones = options.get(CONF_ZONES, {})
-    for zone_num_str, zone_info in configured_zones.items():
-        zone_num = int(zone_num_str)
-        entities.append(CrowZoneSensor(
-            controller, host, zone_num, zone_info["name"], zone_info["type"]
-        ))
 
-    # 2. SYSTEM STATUS (Diagnose Sensoren)
-    # Definition: (Key im Dict, Name für UI, Device Class)
+    if not configured_zones:
+        for i in range(1, 17):
+            configured_zones[str(i)] = {"name": f"Zone {i}", "type": "motion"}
+
+    _LOGGER.info("Setting up %d Zone Sensors.", len(configured_zones))
+    
+    for zone_num_str, zone_info in configured_zones.items():
+        try:
+            zone_num = int(zone_num_str)
+            entities.append(CrowZoneSensor(
+                controller, host, zone_num, zone_info["name"], zone_info["type"]
+            ))
+        except ValueError:
+             _LOGGER.warning("Skipping invalid zone config key: %s", zone_num_str)
+
     system_sensors = [
         (CONF_OBJ_MAINS, "Mains Power", BinarySensorDeviceClass.POWER),
         (CONF_OBJ_BATTERY, "System Battery", BinarySensorDeviceClass.BATTERY),
@@ -49,9 +56,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     async_add_entities(entities)
 
-
 class CrowBaseEntity(BinarySensorEntity):
-    """Basisklasse für alle Crow Binary Sensoren."""
     _attr_has_entity_name = True
 
     def __init__(self, controller, host):
@@ -69,7 +74,6 @@ class CrowBaseEntity(BinarySensorEntity):
         )
 
 class CrowZoneSensor(CrowBaseEntity):
-    """Repräsentation einer Alarm-Zone (Fenster/Tür)."""
     def __init__(self, controller, host, zone_number, zone_name, zone_type):
         super().__init__(controller, host)
         self._zone_number = zone_number
@@ -85,11 +89,13 @@ class CrowZoneSensor(CrowBaseEntity):
 
     @property
     def is_on(self):
-        return self._info["status"]["open"]
+        if not self._info or "status" not in self._info:
+            return False
+        return self._info["status"].get("open", False)
 
     @property
     def extra_state_attributes(self):
-        return self._info["status"]
+        return self._info.get("status", {})
 
     @callback
     def _update_callback(self, zone):
@@ -99,16 +105,12 @@ class CrowZoneSensor(CrowBaseEntity):
             self.async_write_ha_state()
 
 class CrowSystemStatusSensor(CrowBaseEntity):
-    """Repräsentation eines System-Status (Diagnose)."""
-    
     def __init__(self, controller, host, key, name, device_class):
         super().__init__(controller, host)
         self._key = key
         self._attr_name = name
         self._attr_device_class = device_class
         self._attr_unique_id = f"crow_sys_{key}"
-        
-        # WICHTIG: Setzt diese Sensoren in den Bereich "Diagnose"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_added_to_hass(self):
@@ -118,36 +120,27 @@ class CrowSystemStatusSensor(CrowBaseEntity):
 
     @property
     def is_on(self):
-        """Berechnet den Status basierend auf dem Typ."""
         status = self._controller.system_state.get("status", {})
-        # Standard: API sendet True für "Alles OK" (Mains Present, Battery OK, Tamper Closed)
-        val = status.get(self._key, False) 
+        val = status.get(self._key, True) # Default to True (Often means 'Good' for system lines)
         
-        # 1. POWER (Mains):
-        # HA erwartet ON wenn Strom da ist.
-        # Crow sendet True wenn Strom da ist. -> Direkt übernehmen.
-        if self._attr_device_class == BinarySensorDeviceClass.POWER:
+        # 1. POWER & CONNECTIVITY:
+        # True = Connected/PowerOK -> ON in HA
+        if self._attr_device_class in [BinarySensorDeviceClass.POWER, BinarySensorDeviceClass.CONNECTIVITY]:
             return val
             
-        # 2. CONNECTIVITY (Line/Dialler):
-        # HA erwartet ON wenn Verbunden.
-        # Crow sendet True wenn OK. -> Direkt übernehmen.
-        if self._attr_device_class == BinarySensorDeviceClass.CONNECTIVITY:
-            return val
-
-        # 3. BATTERY:
-        # HA erwartet ON wenn Batterie SCHWACH (Low) ist.
-        # Crow sendet True wenn Batterie OK ist. -> Invertieren!
+        # 2. BATTERY:
+        # True = Battery OK -> HA OFF (No Problem)
+        # False = Battery Low -> HA ON (Problem)
         if self._attr_device_class == BinarySensorDeviceClass.BATTERY:
             return not val 
-            
-        # 4. TAMPER:
-        # HA erwartet ON wenn MANIPULATION erkannt (Offen).
-        # Crow sendet True wenn Gehäuse OK (Geschlossen). -> Invertieren!
-        if self._attr_device_class == BinarySensorDeviceClass.TAMPER:
-            return not val
 
-        # Fallback
+        # 3. TAMPER:
+        # True = Tamper Open/Alarm -> HA ON (Problem)
+        # False = Tamper Closed/OK -> HA OFF (No Problem)
+        # NO INVERSION NEEDED HERE based on user feedback
+        if self._attr_device_class == BinarySensorDeviceClass.TAMPER:
+            return val
+
         return val
 
     @callback
