@@ -1,5 +1,9 @@
 # Crow/AAP Alarm IP Module for Home Assistant
 
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Maintainer](https://img.shields.io/badge/maintainer-acdcnow-blue)](https://github.com/acdcnow)
+[![Version](https://img.shields.io/badge/version-1.1.4-green)]()
+
 This is a custom component for Home Assistant to integrate **Crow Runner** alarm systems equipped with the **IP Module** (IA-IP-MODULE) running Firmware Ver 2.10.3628 2017 Oct 20 09:48:43.
 
 ## ✨ Features
