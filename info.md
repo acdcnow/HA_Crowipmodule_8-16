@@ -1,5 +1,9 @@
 # Crow/AAP Alarm IP Module
 
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Maintainer](https://img.shields.io/badge/maintainer-acdcnow-blue)](https://github.com/acdcnow)
+[![Version](https://img.shields.io/badge/version-1.1.4-green)]()
+
 **A robust Home Assistant integration for Crow Runner and AAP (Arrowhead Alarm Products) alarm systems via the IP Module.**
 
 This integration provides local, real-time control and monitoring of your alarm system without relying on cloud services.
