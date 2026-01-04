@@ -1,68 +1,104 @@
 """Crow/AAP IP Module init file."""
 import asyncio
 import logging
-import voluptuous as vol
+import os
+import sys
 
-from .crow_service import CrowIPAlarmPanel
-from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.const import (
     CONF_HOST, CONF_PORT, CONF_TIMEOUT, EVENT_HOMEASSISTANT_STOP, Platform
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+# --- LIBRARY IMPORT HACK ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+from pycrowipmodule import CrowIPAlarmPanel
+# ---------------------------
+
 from .const import (
-    DOMAIN, SIGNAL_ZONE_UPDATE, SIGNAL_AREA_UPDATE, 
-    SIGNAL_SYSTEM_UPDATE, SIGNAL_OUTPUT_UPDATE, CONF_KEEP_ALIVE
+    DOMAIN, CONF_KEEP_ALIVE,
+    SIGNAL_ZONE_UPDATE, SIGNAL_AREA_UPDATE, 
+    SIGNAL_SYSTEM_UPDATE, SIGNAL_OUTPUT_UPDATE
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.ALARM_CONTROL_PANEL, Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 
-CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({}, extra=vol.ALLOW_EXTRA)}, extra=vol.ALLOW_EXTRA)
-
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the Crow IP Module component."""
     hass.data.setdefault(DOMAIN, {})
-    if DOMAIN in config:
-        hass.async_create_task(
-            hass.config_entries.flow.async_init(
-                DOMAIN, context={"source": SOURCE_IMPORT}, data=config[DOMAIN]
-            )
-        )
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Crow IP Module from a config entry."""
+    _LOGGER.info("Starting Crow IP Module setup for entry: %s", entry.title)
+    
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
     keep_alive = entry.data.get(CONF_KEEP_ALIVE, 60)
     connection_timeout = entry.data.get(CONF_TIMEOUT, 10)
     
-    code = ""
-    # Wir laden keinen Default-Code mehr aktiv vor, da der User ihn eingeben muss.
-    # Aber wir übergeben ihn falls vorhanden als Fallback.
-    if entry.options and "areas" in entry.options:
-         area1 = entry.options["areas"].get("1", {})
-         code = area1.get("code", "")
-
-    controller = CrowIPAlarmPanel(
-        host, port, code, keep_alive, hass.loop, connection_timeout
-    )
+    try:
+        controller = CrowIPAlarmPanel(
+            host, port, "0000", keep_alive, None, connection_timeout
+        )
+    except Exception as e:
+        _LOGGER.error("Failed to initialize CrowIPAlarmPanel object: %s", e)
+        return False
 
     hass.data[DOMAIN][entry.entry_id] = controller
 
+    # ... (HIER FOLGEN DIE GANZEN CALLBACKS WIE ZUVOR) ...
+    # (Ich kürze das hier ab, kopiere deine Callbacks 1:1 wieder rein)
     def _thread_safe_send(signal, data):
         hass.loop.call_soon_threadsafe(async_dispatcher_send, hass, signal, data)
 
-    controller.callback_zone_state_change = lambda data: _thread_safe_send(SIGNAL_ZONE_UPDATE, data)
-    controller.callback_area_state_change = lambda data: _thread_safe_send(SIGNAL_AREA_UPDATE, data)
-    controller.callback_system_state_change = lambda data: _thread_safe_send(SIGNAL_SYSTEM_UPDATE, data)
-    controller.callback_output_state_change = lambda data: _thread_safe_send(SIGNAL_OUTPUT_UPDATE, data)
-    controller.callback_connected = lambda data: _LOGGER.info("Connected to Crow IP Module")
-    controller.callback_login_timeout = lambda data: _LOGGER.error("Connection failed")
+    def zones_updated_callback(data):
+        _thread_safe_send(SIGNAL_ZONE_UPDATE, data)
 
-    _LOGGER.info("Starting CrowIpModule connection...")
-    controller.start()
+    def areas_updated_callback(data):
+        _thread_safe_send(SIGNAL_AREA_UPDATE, data)
+
+    def system_updated_callback(data):
+        _thread_safe_send(SIGNAL_SYSTEM_UPDATE, data)
+
+    def output_updated_callback(data):
+        _thread_safe_send(SIGNAL_OUTPUT_UPDATE, data)
+
+    def connected_callback(data):
+        _LOGGER.info("Successfully connected to Crow IP Module at %s", host)
+        async def delayed_refresh():
+            await asyncio.sleep(2.0)
+            async_dispatcher_send(hass, SIGNAL_SYSTEM_UPDATE, None)
+            async_dispatcher_send(hass, SIGNAL_AREA_UPDATE, None)
+            async_dispatcher_send(hass, SIGNAL_ZONE_UPDATE, None)
+            async_dispatcher_send(hass, SIGNAL_OUTPUT_UPDATE, None)
+        hass.loop.create_task(delayed_refresh())
+
+    def connection_fail_callback(data):
+        _LOGGER.warning("Connection lost/failed to Crow IP Module. Reconnecting...")
+
+    controller.callback_zone_state_change = zones_updated_callback
+    controller.callback_area_state_change = areas_updated_callback
+    controller.callback_system_state_change = system_updated_callback
+    controller.callback_output_state_change = output_updated_callback
+    controller.callback_connected = connected_callback
+    controller.callback_login_timeout = connection_fail_callback
+
+    _LOGGER.debug("Waiting 2s for socket cleanup before start...")
+    await asyncio.sleep(2.0)
+
+    _LOGGER.info("Starting CrowIpModule background thread...")
+    try:
+        hass.async_add_executor_job(controller.start)
+    except Exception as e:
+         _LOGGER.error("Fatal error starting controller thread: %s", e)
+         return False
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
@@ -70,14 +106,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, lambda event: controller.stop())
     )
 
+    # --- NewNEU: Listener for Option-cahnge regestration ---
+    entry.async_on_unload(entry.add_update_listener(update_listener))
+    # --------------------------------------------------------
+
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    _LOGGER.info("Unloading Crow IP Module entry.")
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         controller = hass.data[DOMAIN][entry.entry_id]
-        controller.stop()
-        # Warte auf Socket Release
-        await asyncio.sleep(1) 
+        _LOGGER.info("Stopping Crow IP Module connection...")
+        await hass.async_add_executor_job(controller.stop)
         hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
+
+# --- new: This function is reloading the integartion if something has changed in the options order to take the changes into account! ---
+async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Update listener to reload the integration when options are changed."""
+    _LOGGER.info("Options updated, reloading Crow IP Module integration...")
+    await hass.config_entries.async_reload(entry.entry_id)

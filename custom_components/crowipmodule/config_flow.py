@@ -1,96 +1,165 @@
 """Config flow for Crow IP Module integration."""
 import logging
 import voluptuous as vol
+
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TIMEOUT
-from .const import DOMAIN, DEFAULT_PORT, DEFAULT_TIMEOUT, DEFAULT_KEEPALIVE, CONF_KEEP_ALIVE, CONF_AREAS, CONF_ZONES, CONF_OUTPUTS
+
+from .const import (
+    DOMAIN,
+    DEFAULT_PORT,
+    DEFAULT_TIMEOUT,
+    DEFAULT_KEEPALIVE,
+    CONF_KEEP_ALIVE,
+    CONF_AREAS,
+    CONF_ZONES,
+    CONF_OUTPUTS,
+    CONF_NUM_AREAS,
+    CONF_NUM_ZONES,
+    CONF_NUM_OUTPUTS,
+    CONF_FW_VERSION,
+    CONF_FW_DATE,
+    FIRMWARE_PROFILES,
+    DEFAULT_FW_VERSION,
+    MAX_AREAS,
+    MAX_ZONES,
+    MAX_OUTPUTS,
+    DEFAULT_NUM_AREAS,
+    DEFAULT_NUM_ZONES,
+    DEFAULT_NUM_OUTPUTS,
+    DEFAULT_FW_DATE # <--- Wichtig
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-ZONE_TYPES = ["motion", "door", "window", "smoke", "gas", "co", "tamper", "safety"]
+ZONE_TYPES = [
+    "window", "motion", "door", "smoke", "gas", "co", "tamper", "safety"
+]
+
+PAGE_SIZE = 4
 
 class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Crow IP Module."""
+
     VERSION = 1
+
     def __init__(self):
-        self.areas_config = {}
-        self.outputs_config = {}
-        self.zones_count = 0
-        self.zones_config = {}
+        self._data = {}
+        self._options = {}
+        self._zone_page = 0
 
     async def async_step_user(self, user_input=None):
-        return await self.async_step_areas()
-
-    async def async_step_areas(self, user_input=None):
-        if user_input is not None:
-            self.areas_config = user_input
-            return await self.async_step_outputs()
-        schema = {}
-        for i in range(1, 3):
-            schema[vol.Optional(f"area_{i}_name", default=f"Area {i}")] = str
-            schema[vol.Optional(f"area_{i}_code", default="")] = str
-        return self.async_show_form(step_id="areas", data_schema=vol.Schema(schema))
-
-    async def async_step_outputs(self, user_input=None):
-        if user_input is not None:
-            self.outputs_config = user_input
-            return await self.async_step_zones_count()
-        schema = {
-            vol.Optional("output_1_name", description={"suggested_value": "Relay 1"}): str,
-            vol.Optional("output_2_name", description={"suggested_value": "Relay 2"}): str,
-        }
-        return self.async_show_form(step_id="outputs", data_schema=vol.Schema(schema))
-
-    async def async_step_zones_count(self, user_input=None):
-        if user_input is not None:
-            self.zones_count = user_input["zone_count"]
-            return await self.async_step_zones()
-        schema = {vol.Required("zone_count", default=8): vol.All(int, vol.Range(min=1, max=16))}
-        return self.async_show_form(step_id="zones_count", data_schema=vol.Schema(schema))
-
-    async def async_step_zones(self, user_input=None):
-        if user_input is not None:
-            self.zones_config = user_input
-            return await self.async_step_connection()
-        schema = {}
-        for i in range(1, self.zones_count + 1):
-            schema[vol.Optional(f"zone_{i}_name")] = str
-            schema[vol.Optional(f"zone_{i}_type", default="motion")] = vol.In(ZONE_TYPES)
-        return self.async_show_form(step_id="zones", data_schema=vol.Schema(schema))
-
-    async def async_step_connection(self, user_input=None):
+        """Step 1: Connection details and counts."""
         errors = {}
         if user_input is not None:
-            host = user_input[CONF_HOST]
-            port = user_input.get(CONF_PORT, DEFAULT_PORT)
-            await self.async_set_unique_id(f"{host}_{port}")
-            self._abort_if_unique_id_configured()
+            self._data = user_input
             
-            final_areas = {}
-            for i in range(1, 3):
-                name = self.areas_config.get(f"area_{i}_name")
-                if name: final_areas[str(i)] = {"name": name, "code": self.areas_config.get(f"area_{i}_code", ""), "code_arm_required": True}
+            selected_version = user_input[CONF_FW_VERSION]
+            self._data[CONF_FW_DATE] = FIRMWARE_PROFILES.get(selected_version, "unknown")
             
-            final_outputs = {}
-            if self.outputs_config.get("output_1_name"): final_outputs["1"] = {"name": self.outputs_config.get("output_1_name")}
-            if self.outputs_config.get("output_2_name"): final_outputs["2"] = {"name": self.outputs_config.get("output_2_name")}
+            self._options[CONF_AREAS] = {}
+            self._options[CONF_OUTPUTS] = {}
+            self._options[CONF_ZONES] = {}
             
-            final_zones = {}
-            for i in range(1, self.zones_count + 1):
-                name = self.zones_config.get(f"zone_{i}_name")
-                if name: final_zones[str(i)] = {"name": name, "type": self.zones_config.get(f"zone_{i}_type", "motion")}
+            unique_id = f"{user_input[CONF_HOST]}_{user_input[CONF_PORT]}"
+            await self.async_set_unique_id(unique_id)
+            if self._abort_if_unique_id_configured():
+                return self.async_abort(reason="unique_id_configured")
             
-            data = {CONF_HOST: host, CONF_PORT: port, CONF_KEEP_ALIVE: user_input.get(CONF_KEEP_ALIVE, DEFAULT_KEEPALIVE), CONF_TIMEOUT: user_input.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)}
-            options = {CONF_AREAS: final_areas, CONF_ZONES: final_zones, CONF_OUTPUTS: final_outputs}
-            return self.async_create_entry(title=host, data=data, options=options)
+            return await self.async_step_areas()
 
-        data_schema = vol.Schema({
+        fw_options = list(FIRMWARE_PROFILES.keys())
+
+        schema = vol.Schema({
             vol.Required(CONF_HOST): str,
             vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
             vol.Optional(CONF_KEEP_ALIVE, default=DEFAULT_KEEPALIVE): int,
             vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): int,
+            
+            vol.Required(CONF_FW_VERSION, default=DEFAULT_FW_VERSION): vol.In(fw_options),
+            
+            vol.Required(CONF_NUM_AREAS, default=DEFAULT_NUM_AREAS): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_AREAS)),
+            vol.Required(CONF_NUM_OUTPUTS, default=DEFAULT_NUM_OUTPUTS): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_OUTPUTS)),
+            vol.Required(CONF_NUM_ZONES, default=DEFAULT_NUM_ZONES): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_ZONES)),
         })
-        return self.async_show_form(step_id="connection", data_schema=data_schema, errors=errors)
+
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def async_step_areas(self, user_input=None):
+        count = self._data.get(CONF_NUM_AREAS, DEFAULT_NUM_AREAS)
+        
+        if user_input is not None:
+            areas_config = {}
+            for i in range(1, count + 1):
+                areas_config[str(i)] = {
+                    "name": user_input.get(f"area_{i}_name"), 
+                    "code": user_input.get(f"area_{i}_code", ""), 
+                    "code_arm_required": True
+                }
+            self._options[CONF_AREAS] = areas_config
+            return await self.async_step_outputs()
+
+        schema = {}
+        for i in range(1, count + 1):
+            schema[vol.Required(f"area_{i}_name", default=f"Area {i}")] = str
+            schema[vol.Optional(f"area_{i}_code", default="")] = str
+
+        return self.async_show_form(step_id="areas", data_schema=vol.Schema(schema))
+
+    async def async_step_outputs(self, user_input=None):
+        count = self._data.get(CONF_NUM_OUTPUTS, DEFAULT_NUM_OUTPUTS)
+
+        if user_input is not None:
+            outputs_config = {}
+            for i in range(1, count + 1):
+                name = user_input.get(f"output_{i}_name")
+                if name:
+                    outputs_config[str(i)] = {"name": name}
+            
+            self._options[CONF_OUTPUTS] = outputs_config
+            self._zone_page = 0
+            return await self.async_step_zones()
+
+        schema = {}
+        for i in range(1, count + 1):
+            default_name = f"Output {i}"
+            schema[vol.Optional(f"output_{i}_name", description={"suggested_value": default_name})] = str
+
+        return self.async_show_form(step_id="outputs", data_schema=vol.Schema(schema))
+
+    async def async_step_zones(self, user_input=None):
+        count = self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)
+        
+        if user_input is not None:
+            for key, value in user_input.items():
+                if key.startswith("zone_") and key.endswith("_name"):
+                    idx = key.split("_")[1]
+                    if idx not in self._options[CONF_ZONES]:
+                        self._options[CONF_ZONES][idx] = {}
+                    self._options[CONF_ZONES][idx]["name"] = value
+                elif key.startswith("zone_") and key.endswith("_type"):
+                    idx = key.split("_")[1]
+                    if idx not in self._options[CONF_ZONES]:
+                        self._options[CONF_ZONES][idx] = {}
+                    self._options[CONF_ZONES][idx]["type"] = value
+            self._zone_page += 1
+
+        start_idx = self._zone_page * PAGE_SIZE + 1
+        if start_idx > count:
+            return self.async_create_entry(
+                title=self._data[CONF_HOST],
+                data=self._data,
+                options=self._options
+            )
+
+        end_idx = min(start_idx + PAGE_SIZE - 1, count)
+        schema = {}
+        for i in range(start_idx, end_idx + 1):
+            schema[vol.Optional(f"zone_{i}_name")] = str
+            schema[vol.Optional(f"zone_{i}_type", default="window")] = vol.In(ZONE_TYPES)
+
+        return self.async_show_form(step_id="zones", data_schema=vol.Schema(schema))
 
     @staticmethod
     @callback
@@ -100,50 +169,126 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class CrowOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
-        self.entry = config_entry
-        self.areas_input = {}
-        self.outputs_input = {}
-    async def async_step_init(self, user_input=None): return await self.async_step_areas()
+        self._config_entry = config_entry
+        self._temp_data = {}
+        self._temp_options = {}
+        self._zone_page = 0
+
+    async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            self._temp_data = user_input
+            
+            # Datum updaten falls Version geändert wurde
+            new_version = user_input.get(CONF_FW_VERSION)
+            if new_version:
+                self._temp_data[CONF_FW_DATE] = FIRMWARE_PROFILES.get(new_version, "unknown")
+            
+            return await self.async_step_areas()
+
+        data = self._config_entry.data
+        options = self._config_entry.options
+        
+        c_areas = data.get(CONF_NUM_AREAS, len(options.get(CONF_AREAS, {})) or DEFAULT_NUM_AREAS)
+        c_zones = data.get(CONF_NUM_ZONES, len(options.get(CONF_ZONES, {})) or DEFAULT_NUM_ZONES)
+        c_outputs = data.get(CONF_NUM_OUTPUTS, len(options.get(CONF_OUTPUTS, {})) or DEFAULT_NUM_OUTPUTS)
+        
+        current_fw = data.get(CONF_FW_VERSION, DEFAULT_FW_VERSION)
+        fw_options = list(FIRMWARE_PROFILES.keys())
+
+        schema = vol.Schema({
+            vol.Required(CONF_HOST, default=data.get(CONF_HOST)): str,
+            vol.Optional(CONF_PORT, default=data.get(CONF_PORT, DEFAULT_PORT)): int,
+            vol.Optional(CONF_KEEP_ALIVE, default=data.get(CONF_KEEP_ALIVE, DEFAULT_KEEPALIVE)): int,
+            vol.Optional(CONF_TIMEOUT, default=data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)): int,
+            
+            vol.Required(CONF_FW_VERSION, default=current_fw): vol.In(fw_options),
+
+            vol.Required(CONF_NUM_AREAS, default=c_areas): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_AREAS)),
+            vol.Required(CONF_NUM_OUTPUTS, default=c_outputs): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_OUTPUTS)),
+            vol.Required(CONF_NUM_ZONES, default=c_zones): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_ZONES)),
+        })
+
+        return self.async_show_form(step_id="init", data_schema=schema)
+
     async def async_step_areas(self, user_input=None):
+        count = self._temp_data.get(CONF_NUM_AREAS, DEFAULT_NUM_AREAS)
         if user_input is not None:
-            self.areas_input = user_input
+            self._temp_options[CONF_AREAS] = {}
+            for i in range(1, count + 1):
+                self._temp_options[CONF_AREAS][str(i)] = {
+                    "name": user_input.get(f"area_{i}_name"),
+                    "code": user_input.get(f"area_{i}_code", ""),
+                    "code_arm_required": True
+                }
             return await self.async_step_outputs()
-        all_areas = self.entry.options.get(CONF_AREAS, {})
+
+        existing = self._config_entry.options.get(CONF_AREAS, {})
         schema = {}
-        for i in range(1, 3):
-            area = all_areas.get(str(i), {})
-            schema[vol.Optional(f"area_{i}_name", description={"suggested_value": area.get("name", f"Area {i}")})] = str
-            schema[vol.Optional(f"area_{i}_code", description={"suggested_value": area.get("code", "")})] = str
+        for i in range(1, count + 1):
+            d = existing.get(str(i), {})
+            schema[vol.Optional(f"area_{i}_name", default=d.get("name", f"Area {i}"))] = str
+            schema[vol.Optional(f"area_{i}_code", default=d.get("code", ""))] = str
         return self.async_show_form(step_id="areas", data_schema=vol.Schema(schema))
+
     async def async_step_outputs(self, user_input=None):
+        count = self._temp_data.get(CONF_NUM_OUTPUTS, DEFAULT_NUM_OUTPUTS)
+        
         if user_input is not None:
-            self.outputs_input = user_input
+            self._temp_options[CONF_OUTPUTS] = {}
+            for i in range(1, count + 1):
+                name = user_input.get(f"output_{i}_name")
+                if name:
+                    self._temp_options[CONF_OUTPUTS][str(i)] = {"name": name}
+            
+            self._zone_page = 0
+            self._temp_options[CONF_ZONES] = {}
             return await self.async_step_zones()
-        all_outputs = self.entry.options.get(CONF_OUTPUTS, {})
+
+        existing = self._config_entry.options.get(CONF_OUTPUTS, {})
         schema = {}
-        for i in range(1, 3):
-            out = all_outputs.get(str(i), {})
-            schema[vol.Optional(f"output_{i}_name", description={"suggested_value": out.get("name", "")})] = str
+        for i in range(1, count + 1):
+            d = existing.get(str(i), {})
+            default = d.get("name", "")
+            if not default: default = f"Output {i}"
+            schema[vol.Optional(f"output_{i}_name", description={"suggested_value": default})] = str
         return self.async_show_form(step_id="outputs", data_schema=vol.Schema(schema))
+
     async def async_step_zones(self, user_input=None):
+        count = self._temp_data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)
+        
         if user_input is not None:
-            areas_config = {}
-            for i in range(1, 3):
-                 if self.areas_input.get(f"area_{i}_name"): areas_config[str(i)] = {"name": self.areas_input[f"area_{i}_name"], "code": self.areas_input.get(f"area_{i}_code",""), "code_arm_required": True}
-            outputs_config = {}
-            for i in range(1, 3):
-                 if self.outputs_input.get(f"output_{i}_name"): outputs_config[str(i)] = {"name": self.outputs_input[f"output_{i}_name"]}
-            zones_config = {}
-            for k, v in user_input.items():
-                if k.startswith("zone_") and k.endswith("_name") and v:
-                    idx = k.split("_")[1]
-                    zones_config[idx] = {"name": v, "type": user_input.get(f"zone_{idx}_type", "motion")}
-            return self.async_create_entry(title="", data={CONF_AREAS: areas_config, CONF_ZONES: zones_config, CONF_OUTPUTS: outputs_config})
-        all_zones = self.entry.options.get(CONF_ZONES, {})
-        max_zone = max([int(k) for k in all_zones.keys()] or [8])
+            for key, value in user_input.items():
+                if key.startswith("zone_") and key.endswith("_name"):
+                    idx = key.split("_")[1]
+                    if idx not in self._temp_options[CONF_ZONES]:
+                        self._temp_options[CONF_ZONES][idx] = {}
+                    self._temp_options[CONF_ZONES][idx]["name"] = value
+                elif key.startswith("zone_") and key.endswith("_type"):
+                    idx = key.split("_")[1]
+                    if idx not in self._temp_options[CONF_ZONES]:
+                        self._temp_options[CONF_ZONES][idx] = {}
+                    self._temp_options[CONF_ZONES][idx]["type"] = value
+            self._zone_page += 1
+
+        start_idx = self._zone_page * PAGE_SIZE + 1
+        
+        if start_idx > count:
+            new_data = self._config_entry.data.copy()
+            new_data.update(self._temp_data)
+            self.hass.config_entries.async_update_entry(self._config_entry, data=new_data, options=self._temp_options)
+            await self.hass.config_entries.async_reload(self._config_entry.entry_id)
+            return self.async_create_entry(title="", data={})
+
+        existing_zones = self._config_entry.options.get(CONF_ZONES, {})
+        end_idx = min(start_idx + PAGE_SIZE - 1, count)
+        
         schema = {}
-        for i in range(1, max_zone + 1):
-             z = all_zones.get(str(i), {})
-             schema[vol.Optional(f"zone_{i}_name", description={"suggested_value": z.get("name", "")})] = str
-             schema[vol.Optional(f"zone_{i}_type", default=z.get("type", "motion"))] = vol.In(ZONE_TYPES)
+        for i in range(start_idx, end_idx + 1):
+            d = existing_zones.get(str(i), {})
+            current_name = d.get("name", "")
+            current_type = d.get("type", "window") 
+            
+            schema[vol.Optional(f"zone_{i}_name", description={"suggested_value": current_name})] = str
+            schema[vol.Optional(f"zone_{i}_type", default=current_type)] = vol.In(ZONE_TYPES)
+
         return self.async_show_form(step_id="zones", data_schema=vol.Schema(schema))

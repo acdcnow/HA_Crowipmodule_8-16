@@ -17,58 +17,73 @@ from homeassistant.const import CONF_HOST
 from .const import (
     DOMAIN,
     SIGNAL_AREA_UPDATE,
+    SIGNAL_KEYPAD_UPDATE,
     CONF_AREAS,
+    CONF_FW_VERSION,
+    CONF_FW_DATE,
+    DEFAULT_FW_VERSION,
+    DEFAULT_FW_DATE # <--- Dieser Import funktioniert jetzt wieder
 )
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    _LOGGER.debug("Setting up Alarm Control Panel entities...")
     controller = hass.data[DOMAIN][entry.entry_id]
     options = entry.options
     host = entry.data[CONF_HOST]
     
+    fw_version = entry.data.get(CONF_FW_VERSION, DEFAULT_FW_VERSION)
+    fw_date = entry.data.get(CONF_FW_DATE, DEFAULT_FW_DATE)
+    
     configured_areas = options.get(CONF_AREAS, {})
     
-    devices = []
     if not configured_areas:
         configured_areas = {
-            "1": {"name": "Area A", "code": "", "code_arm_required": True},
-            "2": {"name": "Area B", "code": "", "code_arm_required": True}
+            "1": {"name": "Area 1", "code": "", "code_arm_required": True},
+            "2": {"name": "Area 2", "code": "", "code_arm_required": True}
         }
 
+    devices = []
     for area_num_str, area_data in configured_areas.items():
-        area_num = int(area_num_str)
-        devices.append(CrowAlarmPanel(
-            controller, host,
-            area_num, 
-            area_data.get("name", f"Area {area_num}"),
-            area_data.get("code", ""),
-            area_data.get("code_arm_required", True)
-        ))
+        try:
+            area_num = int(area_num_str)
+            devices.append(CrowAlarmPanel(
+                controller, host,
+                area_num, 
+                area_data.get("name", f"Area {area_num}"),
+                area_data.get("code", ""),
+                area_data.get("code_arm_required", True),
+                fw_version,
+                fw_date
+            ))
+        except ValueError:
+            _LOGGER.error("Invalid area number found in config: %s", area_num_str)
 
     async_add_entities(devices)
-
 
 class CrowAlarmPanel(AlarmControlPanelEntity):
     _attr_has_entity_name = True
     _attr_name = None
 
-    def __init__(self, controller, host, area_number, name, code, code_required) -> None:
+    def __init__(self, controller, host, area_number, name, code, code_required, fw_version, fw_date) -> None:
         self._controller = controller
         self._host = host
+        self._fw_string = f"{fw_version} ({fw_date})"
+        
         self._area_number_int = area_number
+        self._area_number = "A" if area_number == 1 else "B"
+        
         self._attr_name = name
         self._attr_unique_id = f"crow_area_{area_number}"
         self._attr_icon = "mdi:shield-home"
         
         self._code = code
-        # Wir erzwingen True, damit das Keypad immer da ist für manuelle Eingabe
-        self._code_arm_required_config = True 
+        self._code_arm_required_config = code_required
         
         self._info = controller.area_state.get(area_number, {"status": {}})
 
@@ -79,6 +94,7 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
             name="Crow Alarm System",
             manufacturer="Crow/AAP",
             model="IP Module",
+            sw_version=self._fw_string,
             configuration_url=f"http://{self._host}",
         )
 
@@ -86,68 +102,88 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_AREA_UPDATE, self._update_callback)
         )
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_KEYPAD_UPDATE, self._update_callback)
+        )
 
     @callback
     def _update_callback(self, area) -> None:
-        if area is None or area == self._area_number_int:
+        if area is None or area == self._area_number:
             if self._area_number_int in self._controller.area_state:
                 self._info = self._controller.area_state[self._area_number_int]
             self.async_write_ha_state()
 
     @property
     def code_format(self) -> CodeFormat | None:
-        """Zeige immer das Zahlenfeld an."""
         return CodeFormat.NUMBER
 
     @property
     def code_arm_required(self) -> bool:
-        """Code ist zwingend erforderlich."""
-        return True
+        if self._code:
+            return False
+        return self._code_arm_required_config
 
     @property
     def supported_features(self) -> AlarmControlPanelEntityFeature:
         return (
             AlarmControlPanelEntityFeature.ARM_HOME
             | AlarmControlPanelEntityFeature.ARM_AWAY
-            | AlarmControlPanelEntityFeature.ARM_CUSTOM_BYPASS # Für Bypass Support
             | AlarmControlPanelEntityFeature.TRIGGER
         )
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
-        """Sende CODE + ENTER."""
-        if not code: return
-        _LOGGER.info(f"Panel: Disarming Area {self._area_number_int}")
-        self._controller.disarm(code)
+        _LOGGER.info("User requested DISARM for Area %s", self._area_number)
+        code_to_use = str(code) if code else str(self._code)
+        try:
+            self._controller.disarm(code_to_use)
+        except Exception as e:
+             _LOGGER.error("Error sending disarm command: %s", e)
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
-        """Sende CODE + STAY + ENTER."""
-        if not code: return
-        _LOGGER.info(f"Panel: Arming Home Area {self._area_number_int}")
-        self._controller.arm_stay(code)
+        _LOGGER.info("User requested ARM STAY for Area %s", self._area_number)
+        try:
+            self._controller.arm_stay()
+            code_to_use = str(code) if code else str(self._code)
+            if code_to_use:
+                self._controller.send_keypress(code_to_use)
+        except Exception as e:
+             _LOGGER.error("Error sending arm home command: %s", e)
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        """Sende CODE + ARM + ENTER."""
-        if not code: return
-        _LOGGER.info(f"Panel: Arming Away Area {self._area_number_int}")
-        self._controller.arm_away(code)
-
-    async def async_alarm_arm_custom_bypass(self, code: str | None = None) -> None:
-        """Sende CODE + BYPASS + ENTER."""
-        if not code: return
-        _LOGGER.info(f"Panel: Bypassing Area {self._area_number_int}")
-        self._controller.bypass(code)
+        _LOGGER.info("User requested ARM AWAY for Area %s", self._area_number)
+        try:
+            self._controller.arm_away()
+            code_to_use = str(code) if code else str(self._code)
+            if code_to_use:
+                self._controller.send_keypress(code_to_use)
+        except Exception as e:
+             _LOGGER.error("Error sending arm away command: %s", e)
 
     async def async_alarm_trigger(self, code: str | None = None) -> None:
-        self._controller.panic_alarm("")
+        _LOGGER.warning("User requested PANIC TRIGGER for Area %s", self._area_number)
+        try:
+            self._controller.panic_alarm("")
+        except Exception as e:
+            _LOGGER.error("Error triggering panic: %s", e)
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
+        """Return the state of the device."""
         status = self._info.get("status", {})
         
-        if status.get("alarm"): return AlarmControlPanelState.TRIGGERED
-        if status.get("exit_delay"): return AlarmControlPanelState.PENDING
-        if status.get("stay_armed"): return AlarmControlPanelState.ARMED_HOME
-        if status.get("armed"): return AlarmControlPanelState.ARMED_AWAY
-        if status.get("disarmed") is True: return AlarmControlPanelState.DISARMED
+        if status.get("alarm"): 
+            return AlarmControlPanelState.TRIGGERED
+        if status.get("armed"): 
+            return AlarmControlPanelState.ARMED_AWAY
+        if status.get("stay_armed"): 
+            return AlarmControlPanelState.ARMED_HOME
+        if status.get("exit_delay") or status.get("stay_exit_delay"): 
+            return AlarmControlPanelState.ARMING
+        if status.get("disarmed"): 
+            return AlarmControlPanelState.DISARMED
         
-        return AlarmControlPanelState.DISARMED
+        return None
+    
+    @property
+    def extra_state_attributes(self):
+        return self._info.get("status", {})
