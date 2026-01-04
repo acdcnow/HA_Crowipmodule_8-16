@@ -2,74 +2,100 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configurer Crow IP Module",
-        "description": "Veuillez d'abord configurer vos zones (Areas)."
+        "title": "Module IP Crow",
+        "description": "Entrez les détails de connexion.",
+        "data": {
+          "host": "Hôte / IP",
+          "port": "Port",
+          "firmware_version": "Version du Firmware",
+          "firmware_date": "Date du Firmware",
+          "keepalive_interval": "Intervalle Keep Alive",
+          "timeout": "Timeout",
+          "number_of_areas": "Nombre de secteurs",
+          "number_of_zones": "Nombre de zones",
+          "number_of_outputs": "Nombre de sorties"
+        }
       },
       "areas": {
-        "title": "Configuration des zones (Areas)",
+        "title": "Configurer les secteurs",
+        "description": "Noms et codes.",
         "data": {
-          "area_1_name": "Nom pour la zone 1",
-          "area_1_code": "Code par défaut pour la zone 1",
-          "area_2_name": "Nom pour la zone 2",
-          "area_2_code": "Code par défaut pour la zone 2"
+          "area_1_name": "Nom secteur 1", "area_1_code": "Code secteur 1",
+          "area_2_name": "Nom secteur 2", "area_2_code": "Code secteur 2"
         }
       },
       "outputs": {
-        "title": "Configuration des relais",
+        "title": "Configurer les sorties",
+        "description": "Nommez vos sorties.",
         "data": {
-          "output_1_name": "Nom pour le relais 1",
-          "output_2_name": "Nom pour le relais 2"
-        }
-      },
-      "zones_count": {
-        "title": "Nombre de détecteurs",
-        "data": {
-          "zone_count": "Combien de détecteurs (zones) avez-vous ?"
+          "output_1_name": "Nom sortie 1", "output_2_name": "Nom sortie 2",
+          "output_3_name": "Nom sortie 3", "output_4_name": "Nom sortie 4",
+          "output_5_name": "Nom sortie 5", "output_6_name": "Nom sortie 6",
+          "output_7_name": "Nom sortie 7", "output_8_name": "Nom sortie 8"
         }
       },
       "zones": {
-        "title": "Configuration des détecteurs",
-        "description": "Configurez le nom et le type pour chaque détecteur.",
+        "title": "Configurer les zones",
+        "description": "Noms et types.",
         "data": {
-          "zone_1_name": "Nom pour le détecteur 1", "zone_1_type": "Type pour le détecteur 1",
-          "zone_2_name": "Nom pour le détecteur 2", "zone_2_type": "Type pour le détecteur 2",
-          "zone_3_name": "Nom pour le détecteur 3", "zone_3_type": "Type pour le détecteur 3",
-          "zone_4_name": "Nom pour le détecteur 4", "zone_4_type": "Type pour le détecteur 4",
-          "zone_5_name": "Nom pour le détecteur 5", "zone_5_type": "Type pour le détecteur 5",
-          "zone_6_name": "Nom pour le détecteur 6", "zone_6_type": "Type pour le détecteur 6",
-          "zone_7_name": "Nom pour le détecteur 7", "zone_7_type": "Type pour le détecteur 7",
-          "zone_8_name": "Nom pour le détecteur 8", "zone_8_type": "Type pour le détecteur 8",
-          "zone_9_name": "Nom pour le détecteur 9", "zone_9_type": "Type pour le détecteur 9",
-          "zone_10_name": "Nom pour le détecteur 10", "zone_10_type": "Type pour le détecteur 10",
-          "zone_11_name": "Nom pour le détecteur 11", "zone_11_type": "Type pour le détecteur 11",
-          "zone_12_name": "Nom pour le détecteur 12", "zone_12_type": "Type pour le détecteur 12",
-          "zone_13_name": "Nom pour le détecteur 13", "zone_13_type": "Type pour le détecteur 13",
-          "zone_14_name": "Nom pour le détecteur 14", "zone_14_type": "Type pour le détecteur 14",
-          "zone_15_name": "Nom pour le détecteur 15", "zone_15_type": "Type pour le détecteur 15",
-          "zone_16_name": "Nom pour le détecteur 16", "zone_16_type": "Type pour le détecteur 16"
-        }
-      },
-      "connection": {
-        "title": "Paramètres de connexion",
-        "data": {
-          "host": "Adresse IP",
-          "port": "Port",
-          "keepalive_interval": "Intervalle Keep Alive (sec)",
-          "timeout": "Délai d'attente (sec)"
+          "zone_1_name": "Nom zone 1", "zone_1_type": "Type zone 1",
+          "zone_2_name": "Nom zone 2", "zone_2_type": "Type zone 2",
+          "zone_3_name": "Nom zone 3", "zone_3_type": "Type zone 3",
+          "zone_4_name": "Nom zone 4", "zone_4_type": "Type zone 4",
+          "zone_5_name": "Nom zone 5", "zone_5_type": "Type zone 5",
+          "zone_6_name": "Nom zone 6", "zone_6_type": "Type zone 6",
+          "zone_7_name": "Nom zone 7", "zone_7_type": "Type zone 7",
+          "zone_8_name": "Nom zone 8", "zone_8_type": "Type zone 8",
+          "zone_9_name": "Nom zone 9", "zone_9_type": "Type zone 9",
+          "zone_10_name": "Nom zone 10", "zone_10_type": "Type zone 10",
+          "zone_11_name": "Nom zone 11", "zone_11_type": "Type zone 11",
+          "zone_12_name": "Nom zone 12", "zone_12_type": "Type zone 12",
+          "zone_13_name": "Nom zone 13", "zone_13_type": "Type zone 13",
+          "zone_14_name": "Nom zone 14", "zone_14_type": "Type zone 14",
+          "zone_15_name": "Nom zone 15", "zone_15_type": "Type zone 15",
+          "zone_16_name": "Nom zone 16", "zone_16_type": "Type zone 16"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Échec connexion",
+      "unknown": "Erreur"
+    },
+    "abort": {
+      "already_configured": "Déjà configuré",
+      "unique_id_configured": "Hôte/Port existant"
     }
   },
   "options": {
     "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "host": "Hôte / IP",
+          "port": "Port",
+          "firmware_version": "Version du Firmware",
+          "firmware_date": "Date du Firmware",
+          "keepalive_interval": "Keep Alive",
+          "timeout": "Timeout",
+          "number_of_areas": "Secteurs",
+          "number_of_zones": "Zones",
+          "number_of_outputs": "Sorties"
+        }
+      },
       "areas": {
-        "title": "Modifier les zones (Areas)"
+        "title": "Secteurs",
+        "description": "Mettre à jour.",
+        "data": { "area_1_name": "Nom secteur 1", "area_1_code": "Code secteur 1", "area_2_name": "Nom secteur 2", "area_2_code": "Code secteur 2" }
       },
       "outputs": {
-        "title": "Modifier les relais"
+        "title": "Sorties",
+        "description": "Mettre à jour.",
+        "data": { "output_1_name": "Nom sortie 1", "output_2_name": "Nom sortie 2", "output_3_name": "Nom sortie 3", "output_4_name": "Nom sortie 4", "output_5_name": "Nom sortie 5", "output_6_name": "Nom sortie 6", "output_7_name": "Nom sortie 7", "output_8_name": "Nom sortie 8" }
       },
       "zones": {
-        "title": "Modifier les détecteurs"
+        "title": "Zones",
+        "description": "Mettre à jour.",
+        "data": { "zone_1_name": "Nom zone 1", "zone_1_type": "Type zone 1", "zone_2_name": "Nom zone 2", "zone_2_type": "Type zone 2", "zone_3_name": "Nom zone 3", "zone_3_type": "Type zone 3", "zone_4_name": "Nom zone 4", "zone_4_type": "Type zone 4", "zone_5_name": "Nom zone 5", "zone_5_type": "Type zone 5", "zone_6_name": "Nom zone 6", "zone_6_type": "Type zone 6", "zone_7_name": "Nom zone 7", "zone_7_type": "Type zone 7", "zone_8_name": "Nom zone 8", "zone_8_type": "Type zone 8", "zone_9_name": "Nom zone 9", "zone_9_type": "Type zone 9", "zone_10_name": "Nom zone 10", "zone_10_type": "Type zone 10", "zone_11_name": "Nom zone 11", "zone_11_type": "Type zone 11", "zone_12_name": "Nom zone 12", "zone_12_type": "Type zone 12", "zone_13_name": "Nom zone 13", "zone_13_type": "Type zone 13", "zone_14_name": "Nom zone 14", "zone_14_type": "Type zone 14", "zone_15_name": "Nom zone 15", "zone_15_type": "Type zone 15", "zone_16_name": "Nom zone 16", "zone_16_type": "Type zone 16" }
       }
     }
   }

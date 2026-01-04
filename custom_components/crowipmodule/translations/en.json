@@ -2,69 +2,101 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure Crow IP Module",
-        "description": "Set up your Areas first."
+        "title": "Connect to Crow IP Module",
+        "description": "Enter connection details.",
+        "data": {
+          "host": "Host / IP Address",
+          "port": "Port",
+          "firmware_version": "Firmware Version",
+          "firmware_date": "Firmware Build Date",
+          "keepalive_interval": "Keep Alive Interval",
+          "timeout": "Timeout",
+          "number_of_areas": "Number of Areas",
+          "number_of_zones": "Number of Zones",
+          "number_of_outputs": "Number of Outputs"
+        }
       },
       "areas": {
-        "title": "Area Configuration",
+        "title": "Configure Areas",
+        "description": "Set names and codes.",
         "data": {
-          "area_1_name": "Name for Area 1",
-          "area_1_code": "Default Code for Area 1",
-          "area_2_name": "Name for Area 2",
-          "area_2_code": "Default Code for Area 2"
+          "area_1_name": "Area 1 Name", "area_1_code": "Area 1 Code",
+          "area_2_name": "Area 2 Name", "area_2_code": "Area 2 Code"
         }
       },
       "outputs": {
-        "title": "Relay Configuration",
+        "title": "Configure Outputs",
+        "description": "Name your outputs.",
         "data": {
-          "output_1_name": "Name for Relay 1",
-          "output_2_name": "Name for Relay 2"
-        }
-      },
-      "zones_count": {
-        "title": "Zone Count",
-        "data": {
-          "zone_count": "How many zones do you have?"
+          "output_1_name": "Output 1 Name", "output_2_name": "Output 2 Name",
+          "output_3_name": "Output 3 Name", "output_4_name": "Output 4 Name",
+          "output_5_name": "Output 5 Name", "output_6_name": "Output 6 Name",
+          "output_7_name": "Output 7 Name", "output_8_name": "Output 8 Name"
         }
       },
       "zones": {
-        "title": "Zone Configuration",
-        "description": "Configure name and type for each zone.",
+        "title": "Configure Zones",
+        "description": "Set names and types.",
         "data": {
-          "zone_1_name": "Name for Zone 1", "zone_1_type": "Type for Zone 1",
-          "zone_2_name": "Name for Zone 2", "zone_2_type": "Type for Zone 2",
-          "zone_3_name": "Name for Zone 3", "zone_3_type": "Type for Zone 3",
-          "zone_4_name": "Name for Zone 4", "zone_4_type": "Type for Zone 4",
-          "zone_5_name": "Name for Zone 5", "zone_5_type": "Type for Zone 5",
-          "zone_6_name": "Name for Zone 6", "zone_6_type": "Type for Zone 6",
-          "zone_7_name": "Name for Zone 7", "zone_7_type": "Type for Zone 7",
-          "zone_8_name": "Name for Zone 8", "zone_8_type": "Type for Zone 8",
-          "zone_9_name": "Name for Zone 9", "zone_9_type": "Type for Zone 9",
-          "zone_10_name": "Name for Zone 10", "zone_10_type": "Type for Zone 10",
-          "zone_11_name": "Name for Zone 11", "zone_11_type": "Type for Zone 11",
-          "zone_12_name": "Name for Zone 12", "zone_12_type": "Type for Zone 12",
-          "zone_13_name": "Name for Zone 13", "zone_13_type": "Type for Zone 13",
-          "zone_14_name": "Name for Zone 14", "zone_14_type": "Type for Zone 14",
-          "zone_15_name": "Name for Zone 15", "zone_15_type": "Type for Zone 15",
-          "zone_16_name": "Name for Zone 16", "zone_16_type": "Type for Zone 16"
-        }
-      },
-      "connection": {
-        "title": "Connection Settings",
-        "data": {
-          "host": "IP Address",
-          "port": "Port",
-          "keepalive_interval": "Keep Alive Interval (sec)",
-          "timeout": "Timeout (sec)"
+          "zone_1_name": "Zone 1 Name", "zone_1_type": "Zone 1 Type",
+          "zone_2_name": "Zone 2 Name", "zone_2_type": "Zone 2 Type",
+          "zone_3_name": "Zone 3 Name", "zone_3_type": "Zone 3 Type",
+          "zone_4_name": "Zone 4 Name", "zone_4_type": "Zone 4 Type",
+          "zone_5_name": "Zone 5 Name", "zone_5_type": "Zone 5 Type",
+          "zone_6_name": "Zone 6 Name", "zone_6_type": "Zone 6 Type",
+          "zone_7_name": "Zone 7 Name", "zone_7_type": "Zone 7 Type",
+          "zone_8_name": "Zone 8 Name", "zone_8_type": "Zone 8 Type",
+          "zone_9_name": "Zone 9 Name", "zone_9_type": "Zone 9 Type",
+          "zone_10_name": "Zone 10 Name", "zone_10_type": "Zone 10 Type",
+          "zone_11_name": "Zone 11 Name", "zone_11_type": "Zone 11 Type",
+          "zone_12_name": "Zone 12 Name", "zone_12_type": "Zone 12 Type",
+          "zone_13_name": "Zone 13 Name", "zone_13_type": "Zone 13 Type",
+          "zone_14_name": "Zone 14 Name", "zone_14_type": "Zone 14 Type",
+          "zone_15_name": "Zone 15 Name", "zone_15_type": "Zone 15 Type",
+          "zone_16_name": "Zone 16 Name", "zone_16_type": "Zone 16 Type"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "unique_id_configured": "This host/port combination is already configured."
     }
   },
   "options": {
     "step": {
-      "areas": { "title": "Edit Areas" },
-      "outputs": { "title": "Edit Relays" },
-      "zones": { "title": "Edit Zones" }
+      "init": {
+        "title": "Options",
+        "data": {
+          "host": "Host / IP Address",
+          "port": "Port",
+          "firmware_version": "Firmware Version",
+          "firmware_date": "Firmware Build Date",
+          "keepalive_interval": "Keep Alive Interval",
+          "timeout": "Timeout",
+          "number_of_areas": "Number of Areas",
+          "number_of_zones": "Number of Zones",
+          "number_of_outputs": "Number of Outputs"
+        }
+      },
+      "areas": {
+        "title": "Area Settings",
+        "description": "Update area names and codes.",
+        "data": { "area_1_name": "Area 1 Name", "area_1_code": "Area 1 Code", "area_2_name": "Area 2 Name", "area_2_code": "Area 2 Code" }
+      },
+      "outputs": {
+        "title": "Output Settings",
+        "description": "Update output names.",
+        "data": { "output_1_name": "Output 1 Name", "output_2_name": "Output 2 Name", "output_3_name": "Output 3 Name", "output_4_name": "Output 4 Name", "output_5_name": "Output 5 Name", "output_6_name": "Output 6 Name", "output_7_name": "Output 7 Name", "output_8_name": "Output 8 Name" }
+      },
+      "zones": {
+        "title": "Zone Settings",
+        "description": "Update zone names and types.",
+        "data": { "zone_1_name": "Zone 1 Name", "zone_1_type": "Zone 1 Type", "zone_2_name": "Zone 2 Name", "zone_2_type": "Zone 2 Type", "zone_3_name": "Zone 3 Name", "zone_3_type": "Zone 3 Type", "zone_4_name": "Zone 4 Name", "zone_4_type": "Zone 4 Type", "zone_5_name": "Zone 5 Name", "zone_5_type": "Zone 5 Type", "zone_6_name": "Zone 6 Name", "zone_6_type": "Zone 6 Type", "zone_7_name": "Zone 7 Name", "zone_7_type": "Zone 7 Type", "zone_8_name": "Zone 8 Name", "zone_8_type": "Zone 8 Type", "zone_9_name": "Zone 9 Name", "zone_9_type": "Zone 9 Type", "zone_10_name": "Zone 10 Name", "zone_10_type": "Zone 10 Type", "zone_11_name": "Zone 11 Name", "zone_11_type": "Zone 11 Type", "zone_12_name": "Zone 12 Name", "zone_12_type": "Zone 12 Type", "zone_13_name": "Zone 13 Name", "zone_13_type": "Zone 13 Type", "zone_14_name": "Zone 14 Name", "zone_14_type": "Zone 14 Type", "zone_15_name": "Zone 15 Name", "zone_15_type": "Zone 15 Type", "zone_16_name": "Zone 16 Name", "zone_16_type": "Zone 16 Type" }
+      }
     }
   }
 }
