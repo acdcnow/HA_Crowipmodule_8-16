@@ -11,115 +11,77 @@ from homeassistant.const import CONF_HOST
 
 from .const import (
     DOMAIN, SIGNAL_ZONE_UPDATE, SIGNAL_SYSTEM_UPDATE,
-    CONF_ZONES, 
-    CONF_FW_VERSION, CONF_FW_DATE, 
-    DEFAULT_FW_VERSION, DEFAULT_FW_DATE,
-    # System Sensors
-    CONF_OBJ_MAINS, CONF_OBJ_BATTERY, CONF_OBJ_TAMPER, 
-    CONF_OBJ_LINE, CONF_OBJ_DIALLER, CONF_OBJ_ZONE_BATTERY
+    CONF_ZONES, CONF_OBJ_MAINS, CONF_OBJ_BATTERY, 
+    CONF_OBJ_TAMPER, CONF_OBJ_LINE, CONF_OBJ_DIALLER, CONF_OBJ_ZONE_BATTERY
 )
-
-# Zusätzliche Konstanten für System Sensoren
-CONF_OBJ_FUSE = "fuse"
-CONF_OBJ_PENDANT_BATTERY = "pendantbattery"
-CONF_OBJ_CODE_TAMPER = "codetamper"
-CONF_OBJ_READY = "ready"
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    _LOGGER.debug("Setting up Binary Sensors...")
     controller = hass.data[DOMAIN][entry.entry_id]
     options = entry.options
     host = entry.data[CONF_HOST]
     
-    fw_version = entry.data.get(CONF_FW_VERSION, DEFAULT_FW_VERSION)
-    fw_date = entry.data.get(CONF_FW_DATE, DEFAULT_FW_DATE)
-    
     entities = []
 
-    # BLOCK 1: Hauptsensoren (Zonen Öffnung)
+    # 1. Zone Sensors
     configured_zones = options.get(CONF_ZONES, {})
     if not configured_zones:
         for i in range(1, 17):
             configured_zones[str(i)] = {"name": f"Zone {i}", "type": "window"}
 
-    sorted_zone_ids = sorted([int(k) for k in configured_zones.keys()])
+    for zone_num_str, zone_info in configured_zones.items():
+        try:
+            zone_num = int(zone_num_str)
+            entities.append(CrowZoneSensor(
+                controller, host, zone_num, zone_info["name"], zone_info["type"]
+            ))
+        except ValueError:
+             _LOGGER.warning("Skipping invalid zone config key: %s", zone_num_str)
 
-    for zone_num in sorted_zone_ids:
-        zone_info = configured_zones[str(zone_num)]
-        entities.append(CrowZoneSensor(
-            controller, host, zone_num, zone_info["name"], zone_info["type"], "open", fw_version, fw_date
-        ))
-
-    # BLOCK 2: System Sensoren
+    # 2. System Status Sensors (Restored from original version)
     system_sensors = [
-        (CONF_OBJ_MAINS, "Mains Power", BinarySensorDeviceClass.POWER, False),
-        (CONF_OBJ_BATTERY, "System Battery", BinarySensorDeviceClass.BATTERY, True),
-        (CONF_OBJ_TAMPER, "System Tamper", BinarySensorDeviceClass.TAMPER, False),
-        (CONF_OBJ_LINE, "Phone Line", BinarySensorDeviceClass.CONNECTIVITY, False),
-        (CONF_OBJ_DIALLER, "Dialler", BinarySensorDeviceClass.CONNECTIVITY, False),
-        (CONF_OBJ_ZONE_BATTERY, "Zone Battery", BinarySensorDeviceClass.BATTERY, True),
-        (CONF_OBJ_FUSE, "System Fuse", BinarySensorDeviceClass.PROBLEM, True),
-        (CONF_OBJ_PENDANT_BATTERY, "Pendant Battery", BinarySensorDeviceClass.BATTERY, True),
-        (CONF_OBJ_CODE_TAMPER, "Keypad Tamper (Code)", BinarySensorDeviceClass.TAMPER, False),
-        (CONF_OBJ_READY, "Ready to Arm", BinarySensorDeviceClass.RUNNING, False),
+        (CONF_OBJ_MAINS, "Mains Power", BinarySensorDeviceClass.POWER),
+        (CONF_OBJ_BATTERY, "System Battery", BinarySensorDeviceClass.BATTERY),
+        (CONF_OBJ_TAMPER, "System Tamper", BinarySensorDeviceClass.TAMPER),
+        (CONF_OBJ_LINE, "Phone Line", BinarySensorDeviceClass.CONNECTIVITY),
+        (CONF_OBJ_DIALLER, "Dialler", BinarySensorDeviceClass.CONNECTIVITY),
+        (CONF_OBJ_ZONE_BATTERY, "Zone Battery", BinarySensorDeviceClass.BATTERY),
     ]
-    for key, name, dev_class, invert_logic in system_sensors:
-        entities.append(CrowSystemStatusSensor(controller, host, key, name, dev_class, invert_logic, fw_version, fw_date))
 
-    # BLOCK 3: Zone Tamper
-    for zone_num in sorted_zone_ids:
-        zone_info = configured_zones[str(zone_num)]
-        entities.append(CrowZoneSensor(
-            controller, host, zone_num, f"{zone_info['name']} Tamper", BinarySensorDeviceClass.TAMPER, "tamper", fw_version, fw_date
-        ))
-
-    # BLOCK 4: Zone Bypass
-    for zone_num in sorted_zone_ids:
-        zone_info = configured_zones[str(zone_num)]
-        entities.append(CrowZoneSensor(
-            controller, host, zone_num, f"{zone_info['name']} Bypass", BinarySensorDeviceClass.SAFETY, "bypass", fw_version, fw_date
-        ))
+    for key, name, dev_class in system_sensors:
+        entities.append(CrowSystemStatusSensor(controller, host, key, name, dev_class))
 
     async_add_entities(entities)
 
+
 class CrowBaseEntity(BinarySensorEntity):
     _attr_has_entity_name = True
-    
-    def __init__(self, controller, host, fw_version, fw_date):
+
+    def __init__(self, controller, host):
         self._controller = controller
         self._host = host
-        self._fw_string = f"{fw_version} ({fw_date})"
-
+    
     @property
     def device_info(self) -> DeviceInfo:
+        """Default device info for system sensors (Main Panel)."""
         return DeviceInfo(
             identifiers={(DOMAIN, "crow_alarm_panel")},
             name="Crow Alarm System",
             manufacturer="Crow/AAP",
             model="IP Module",
-            sw_version=self._fw_string,
             configuration_url=f"http://{self._host}",
         )
 
+
 class CrowZoneSensor(CrowBaseEntity):
-    def __init__(self, controller, host, zone_number, zone_name, device_class, attribute_key, fw_version, fw_date):
-        super().__init__(controller, host, fw_version, fw_date)
+    def __init__(self, controller, host, zone_number, zone_name, zone_type):
+        super().__init__(controller, host)
         self._zone_number = zone_number
         self._attr_name = zone_name
-        self._attr_device_class = device_class
-        self._attribute_key = attribute_key
-        
-        self._attr_unique_id = f"crow_zone_{zone_number}_{attribute_key}"
-        
-        # FIX: Verwende DIAGNOSTIC statt CONFIG
-        if attribute_key == "open":
-             self._attr_entity_category = None 
-        else:
-             self._attr_entity_category = EntityCategory.DIAGNOSTIC
-
-        self._info = controller.zone_state.get(zone_number, {"status": {}})
+        self._attr_device_class = zone_type
+        self._attr_unique_id = f"crow_zone_{zone_number}"
+        self._info = controller.zone_state.get(zone_number, {"status": {"open": False}})
 
     async def async_added_to_hass(self):
         self.async_on_remove(
@@ -130,7 +92,7 @@ class CrowZoneSensor(CrowBaseEntity):
     def is_on(self):
         if not self._info or "status" not in self._info:
             return False
-        return self._info["status"].get(self._attribute_key, False)
+        return self._info["status"].get("open", False)
 
     @property
     def extra_state_attributes(self):
@@ -143,13 +105,40 @@ class CrowZoneSensor(CrowBaseEntity):
                 self._info = self._controller.zone_state[self._zone_number]
             self.async_write_ha_state()
 
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info to group entities by type."""
+        # Determine Group based on Zone Type (device_class)
+        if self._attr_device_class == "window":
+            device_name = "Crow Alarm Windows"
+            device_id = "crow_windows"
+        elif self._attr_device_class == "door":
+            device_name = "Crow Alarm Doors"
+            device_id = "crow_doors"
+        else:
+            # Group motion, smoke, and other sensors together into "Crow Alarm Sensors"
+            device_name = "Crow Alarm Sensors"
+            device_id = "crow_sensors"
+
+        return DeviceInfo(
+            identifiers={(DOMAIN, device_id)},
+            name=device_name,
+            manufacturer="Crow/AAP",
+            model="IP Module Zone",
+            # This links the new device to the main Alarm Panel device
+            via_device=(DOMAIN, "crow_alarm_panel"),
+            configuration_url=f"http://{self._host}",
+        )
+
+
 class CrowSystemStatusSensor(CrowBaseEntity):
-    def __init__(self, controller, host, key, name, device_class, invert_logic, fw_version, fw_date):
-        super().__init__(controller, host, fw_version, fw_date)
+    """Sensor for System Statuses (Mains, Battery, etc)."""
+    
+    def __init__(self, controller, host, key, name, device_class):
+        super().__init__(controller, host)
         self._key = key
         self._attr_name = name
         self._attr_device_class = device_class
-        self._invert_logic = invert_logic
         self._attr_unique_id = f"crow_sys_{key}"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -162,8 +151,16 @@ class CrowSystemStatusSensor(CrowBaseEntity):
     def is_on(self):
         status = self._controller.system_state.get("status", {})
         val = status.get(self._key, True) 
-        if self._invert_logic:
-            return not val
+        
+        if self._attr_device_class in [BinarySensorDeviceClass.POWER, BinarySensorDeviceClass.CONNECTIVITY]:
+            return val
+            
+        if self._attr_device_class == BinarySensorDeviceClass.BATTERY:
+            return not val 
+
+        if self._attr_device_class == BinarySensorDeviceClass.TAMPER:
+            return val
+
         return val
 
     @callback
