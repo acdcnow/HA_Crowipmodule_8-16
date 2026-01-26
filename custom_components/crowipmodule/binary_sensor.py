@@ -24,7 +24,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
     
     entities = []
 
-    # 1. Zone Sensors
     configured_zones = options.get(CONF_ZONES, {})
     if not configured_zones:
         for i in range(1, 17):
@@ -39,7 +38,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         except ValueError:
              _LOGGER.warning("Skipping invalid zone config key: %s", zone_num_str)
 
-    # 2. System Status Sensors (Restored from original version)
     system_sensors = [
         (CONF_OBJ_MAINS, "Mains Power", BinarySensorDeviceClass.POWER),
         (CONF_OBJ_BATTERY, "System Battery", BinarySensorDeviceClass.BATTERY),
@@ -54,7 +52,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     async_add_entities(entities)
 
-
 class CrowBaseEntity(BinarySensorEntity):
     _attr_has_entity_name = True
 
@@ -64,7 +61,6 @@ class CrowBaseEntity(BinarySensorEntity):
     
     @property
     def device_info(self) -> DeviceInfo:
-        """Default device info for system sensors (Main Panel)."""
         return DeviceInfo(
             identifiers={(DOMAIN, "crow_alarm_panel")},
             name="Crow Alarm System",
@@ -72,7 +68,6 @@ class CrowBaseEntity(BinarySensorEntity):
             model="IP Module",
             configuration_url=f"http://{self._host}",
         )
-
 
 class CrowZoneSensor(CrowBaseEntity):
     def __init__(self, controller, host, zone_number, zone_name, zone_type):
@@ -105,35 +100,8 @@ class CrowZoneSensor(CrowBaseEntity):
                 self._info = self._controller.zone_state[self._zone_number]
             self.async_write_ha_state()
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info to group entities by type."""
-        # Determine Group based on Zone Type (device_class)
-        if self._attr_device_class == "window":
-            device_name = "Crow Alarm Windows"
-            device_id = "crow_windows"
-        elif self._attr_device_class == "door":
-            device_name = "Crow Alarm Doors"
-            device_id = "crow_doors"
-        else:
-            # Group motion, smoke, and other sensors together into "Crow Alarm Sensors"
-            device_name = "Crow Alarm Sensors"
-            device_id = "crow_sensors"
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, device_id)},
-            name=device_name,
-            manufacturer="Crow/AAP",
-            model="IP Module Zone",
-            # This links the new device to the main Alarm Panel device
-            via_device=(DOMAIN, "crow_alarm_panel"),
-            configuration_url=f"http://{self._host}",
-        )
-
-
 class CrowSystemStatusSensor(CrowBaseEntity):
-    """Sensor for System Statuses (Mains, Battery, etc)."""
-    
+  
     def __init__(self, controller, host, key, name, device_class):
         super().__init__(controller, host)
         self._key = key
