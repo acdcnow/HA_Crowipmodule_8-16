@@ -78,7 +78,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             async_dispatcher_send(hass, SIGNAL_AREA_UPDATE, None)
             async_dispatcher_send(hass, SIGNAL_ZONE_UPDATE, None)
             async_dispatcher_send(hass, SIGNAL_OUTPUT_UPDATE, None)
-        hass.loop.create_task(delayed_refresh())
+        # create_task is NOT thread-safe — use run_coroutine_threadsafe to
+        # schedule the coroutine onto HA's event loop from the panel's background thread.
+        asyncio.run_coroutine_threadsafe(delayed_refresh(), hass.loop)
 
     def connection_fail_callback(data):
         _LOGGER.warning("Connection lost/failed to Crow IP Module. Reconnecting...")

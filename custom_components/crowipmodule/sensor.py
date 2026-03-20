@@ -14,7 +14,8 @@ from .const import (
     SIGNAL_SYSTEM_UPDATE,
     SIGNAL_AREA_UPDATE,
     CONF_FW_VERSION, CONF_FW_DATE, 
-    DEFAULT_FW_VERSION, DEFAULT_FW_DATE
+    DEFAULT_FW_VERSION, DEFAULT_FW_DATE,
+    CONF_AREAS, DEFAULT_NUM_AREAS, CONF_NUM_AREAS
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,13 +34,19 @@ async def async_setup_entry(
     fw_date = entry.data.get(CONF_FW_DATE, DEFAULT_FW_DATE)
     
     _LOGGER.info("Setting up Crow Text Sensors")
-    
-    entities = [
-        CrowSystemSensor(controller, host, fw_version, fw_date),
-        CrowAlarmZoneSensor(controller, host, 1, "Area A Last Alarm", fw_version, fw_date),
-        CrowAlarmZoneSensor(controller, host, 2, "Area B Last Alarm", fw_version, fw_date),
-    ]
-    
+
+    configured_areas = entry.options.get(CONF_AREAS, {})
+    num_areas = len(configured_areas) or entry.data.get(CONF_NUM_AREAS, DEFAULT_NUM_AREAS)
+
+    area_labels = ["A", "B", "C", "D"]
+    entities = [CrowSystemSensor(controller, host, fw_version, fw_date)]
+    for i in range(1, num_areas + 1):
+        area_data = configured_areas.get(str(i), {})
+        area_name = area_data.get("name") or (f"Area {area_labels[i - 1]}" if i <= len(area_labels) else f"Area {i}")
+        entities.append(
+            CrowAlarmZoneSensor(controller, host, i, f"{area_name} Last Alarm", fw_version, fw_date)
+        )
+
     async_add_entities(entities, True)
 
 

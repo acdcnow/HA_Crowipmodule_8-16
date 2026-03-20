@@ -80,7 +80,7 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_FW_VERSION, default=DEFAULT_FW_VERSION): vol.In(fw_options),
             
             vol.Required(CONF_NUM_AREAS, default=DEFAULT_NUM_AREAS): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_AREAS)),
-            vol.Required(CONF_NUM_OUTPUTS, default=DEFAULT_NUM_OUTPUTS): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_OUTPUTS)),
+            vol.Required(CONF_NUM_OUTPUTS, default=DEFAULT_NUM_OUTPUTS): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_OUTPUTS)),
             vol.Required(CONF_NUM_ZONES, default=DEFAULT_NUM_ZONES): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_ZONES)),
         })
 
@@ -109,6 +109,11 @@ class CrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_outputs(self, user_input=None):
         count = self._data.get(CONF_NUM_OUTPUTS, DEFAULT_NUM_OUTPUTS)
+
+        if count == 0:
+            self._options[CONF_OUTPUTS] = {}
+            self._zone_page = 0
+            return await self.async_step_zones()
 
         if user_input is not None:
             outputs_config = {}
@@ -204,7 +209,7 @@ class CrowOptionsFlowHandler(config_entries.OptionsFlow):
             vol.Required(CONF_FW_VERSION, default=current_fw): vol.In(fw_options),
 
             vol.Required(CONF_NUM_AREAS, default=c_areas): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_AREAS)),
-            vol.Required(CONF_NUM_OUTPUTS, default=c_outputs): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_OUTPUTS)),
+            vol.Required(CONF_NUM_OUTPUTS, default=c_outputs): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_OUTPUTS)),
             vol.Required(CONF_NUM_ZONES, default=c_zones): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_ZONES)),
         })
 
@@ -232,7 +237,13 @@ class CrowOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_outputs(self, user_input=None):
         count = self._temp_data.get(CONF_NUM_OUTPUTS, DEFAULT_NUM_OUTPUTS)
-        
+
+        if count == 0:
+            self._temp_options[CONF_OUTPUTS] = {}
+            self._zone_page = 0
+            self._temp_options[CONF_ZONES] = {}
+            return await self.async_step_zones()
+
         if user_input is not None:
             self._temp_options[CONF_OUTPUTS] = {}
             for i in range(1, count + 1):
@@ -275,9 +286,12 @@ class CrowOptionsFlowHandler(config_entries.OptionsFlow):
         if start_idx > count:
             new_data = self._config_entry.data.copy()
             new_data.update(self._temp_data)
-            self.hass.config_entries.async_update_entry(self._config_entry, data=new_data, options=self._temp_options)
-            await self.hass.config_entries.async_reload(self._config_entry.entry_id)
-            return self.async_create_entry(title="", data={})
+            # Only update entry.data here; options are saved by async_create_entry below.
+            # Passing options= here AND data={} to async_create_entry would wipe the options.
+            self.hass.config_entries.async_update_entry(self._config_entry, data=new_data)
+            # async_create_entry saves self._temp_options as the new options and
+            # automatically triggers update_listener → reload. No manual reload needed.
+            return self.async_create_entry(title="", data=self._temp_options)
 
         existing_zones = self._config_entry.options.get(CONF_ZONES, {})
         end_idx = min(start_idx + PAGE_SIZE - 1, count)

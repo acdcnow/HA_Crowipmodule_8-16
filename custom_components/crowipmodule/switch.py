@@ -34,14 +34,14 @@ async def async_setup_entry(
     fw_date = entry.data.get(CONF_FW_DATE, DEFAULT_FW_DATE)
     
     entities = []
-    configured_outputs = options.get(CONF_OUTPUTS, {})
+    configured_outputs = options.get(CONF_OUTPUTS, None)
 
-    # Defaults falls leer
-    if not configured_outputs:
-        configured_outputs = {
-            "1": {"name": "Output 1"},
-            "2": {"name": "Output 2"}
-        }
+    # Only fall back to defaults when the integration has never been configured
+    # (options key absent entirely). An empty dict means the user set outputs to 0.
+    if configured_outputs is None:
+        from .const import CONF_NUM_OUTPUTS, DEFAULT_NUM_OUTPUTS
+        num = entry.data.get(CONF_NUM_OUTPUTS, DEFAULT_NUM_OUTPUTS)
+        configured_outputs = {str(i): {"name": f"Output {i}"} for i in range(1, num + 1)}
 
     for output_num_str, output_data in configured_outputs.items():
         try:

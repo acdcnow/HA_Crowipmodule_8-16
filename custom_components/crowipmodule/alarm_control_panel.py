@@ -19,10 +19,12 @@ from .const import (
     SIGNAL_AREA_UPDATE,
     SIGNAL_KEYPAD_UPDATE,
     CONF_AREAS,
+    CONF_NUM_AREAS,
+    DEFAULT_NUM_AREAS,
     CONF_FW_VERSION,
     CONF_FW_DATE,
     DEFAULT_FW_VERSION,
-    DEFAULT_FW_DATE # <--- Dieser Import funktioniert jetzt wieder
+    DEFAULT_FW_DATE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,11 +43,13 @@ async def async_setup_entry(
     fw_date = entry.data.get(CONF_FW_DATE, DEFAULT_FW_DATE)
     
     configured_areas = options.get(CONF_AREAS, {})
-    
+
     if not configured_areas:
+        # Fall back to creating bare area entries based on the configured count
+        num_areas = entry.data.get(CONF_NUM_AREAS, DEFAULT_NUM_AREAS)
         configured_areas = {
-            "1": {"name": "Area 1", "code": "", "code_arm_required": True},
-            "2": {"name": "Area 2", "code": "", "code_arm_required": True}
+            str(i): {"name": f"Area {i}", "code": "", "code_arm_required": True}
+            for i in range(1, num_areas + 1)
         }
 
     devices = []
@@ -54,7 +58,8 @@ async def async_setup_entry(
             area_num = int(area_num_str)
             devices.append(CrowAlarmPanel(
                 controller, host,
-                area_num, 
+                entry.entry_id,
+                area_num,
                 area_data.get("name", f"Area {area_num}"),
                 area_data.get("code", ""),
                 area_data.get("code_arm_required", True),
@@ -70,16 +75,18 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
     _attr_has_entity_name = True
     _attr_name = None
 
-    def __init__(self, controller, host, area_number, name, code, code_required, fw_version, fw_date) -> None:
+    def __init__(self, controller, host, entry_id, area_number, name, code, code_required, fw_version, fw_date) -> None:
         self._controller = controller
         self._host = host
         self._fw_string = f"{fw_version} ({fw_date})"
-        
+
         self._area_number_int = area_number
         self._area_number = "A" if area_number == 1 else "B"
-        
+
         self._attr_name = name
-        self._attr_unique_id = f"crow_area_{area_number}"
+        # Include entry_id so unique_id is scoped per config entry and entity_id
+        # is generated from the correct area name on first registration.
+        self._attr_unique_id = f"{entry_id}_crow_area_{area_number}"
         self._attr_icon = "mdi:shield-home"
         
         self._code = code
@@ -115,10 +122,15 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
 
     @property
     def code_format(self) -> CodeFormat | None:
+        # Always return NUMBER so HA knows the input type and renders arm/disarm
+        # buttons correctly. Visibility of the code field is controlled by
+        # code_arm_required below.
         return CodeFormat.NUMBER
 
     @property
     def code_arm_required(self) -> bool:
+        # If a code is pre-stored in config the user never needs to type one;
+        # it is sent internally. Return False so HA makes the field optional.
         if self._code:
             return False
         return self._code_arm_required_config
@@ -142,10 +154,10 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         _LOGGER.info("User requested ARM STAY for Area %s", self._area_number)
         try:
+            # ARM/STAY commands are standalone on the Crow protocol - no code follow-up.
+            # Calling send_keypress here would send a KEYS command (identical to disarm)
+            # and immediately cancel the arm.
             self._controller.arm_stay()
-            code_to_use = str(code) if code else str(self._code)
-            if code_to_use:
-                self._controller.send_keypress(code_to_use)
         except Exception as e:
              _LOGGER.error("Error sending arm home command: %s", e)
 
@@ -153,9 +165,6 @@ class CrowAlarmPanel(AlarmControlPanelEntity):
         _LOGGER.info("User requested ARM AWAY for Area %s", self._area_number)
         try:
             self._controller.arm_away()
-            code_to_use = str(code) if code else str(self._code)
-            if code_to_use:
-                self._controller.send_keypress(code_to_use)
         except Exception as e:
              _LOGGER.error("Error sending arm away command: %s", e)
 
