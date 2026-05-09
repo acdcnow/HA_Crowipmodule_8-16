@@ -84,6 +84,7 @@ class CrowIPModuleClient(asyncio.Protocol):
         """asyncio callback for connection lost."""
         _LOGGER.warning(f"Connection lost. Exception: {exc}")
         self._connected = False
+        self._transport = None
         if not self._shutdown:
             _LOGGER.error('The server closed the connection. Reconnecting...')
             ensure_future(self.reconnect(self._alarmPanel.connection_timeout), loop=self._eventLoop)
@@ -100,9 +101,13 @@ class CrowIPModuleClient(asyncio.Protocol):
         _LOGGER.debug('Disconnecting transport...')
         if self._transport:
             self._transport.close()
+            self._transport = None
             
     def send_data(self, data):
         """Raw data send- just make sure it's encoded properly and logged."""
+        if not self._transport:
+            _LOGGER.warning('Cannot send data: no active transport (not yet connected or reconnecting).')
+            return
         raw_bytes = (data + '\r\n').encode('ascii')
         _LOGGER.debug(f'TX RAW: {raw_bytes}')
         try:
