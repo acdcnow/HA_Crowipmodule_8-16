@@ -20,7 +20,7 @@ from pycrowipmodule import CrowIPAlarmPanel
 # ---------------------------
 
 from .const import (
-    DOMAIN, CONF_KEEP_ALIVE,
+    DOMAIN, CONF_KEEP_ALIVE, DEFAULT_KEEPALIVE,
     SIGNAL_ZONE_UPDATE, SIGNAL_AREA_UPDATE, 
     SIGNAL_SYSTEM_UPDATE, SIGNAL_OUTPUT_UPDATE
 )
@@ -40,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
-    keep_alive = entry.data.get(CONF_KEEP_ALIVE, 60)
+    keep_alive = entry.data.get(CONF_KEEP_ALIVE, DEFAULT_KEEPALIVE)
     connection_timeout = entry.data.get(CONF_TIMEOUT, 10)
     
     try:
@@ -115,13 +115,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    _LOGGER.info("Unloading Crow IP Module entry.")
+    _LOGGER.info("Unloading Crow IP Module entry: %s", entry.title)
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        controller = hass.data[DOMAIN][entry.entry_id]
-        _LOGGER.info("Stopping Crow IP Module connection...")
-        await hass.async_add_executor_job(controller.stop)
-        hass.data[DOMAIN].pop(entry.entry_id)
+    if entry.entry_id in hass.data.get(DOMAIN, {}):
+        controller = hass.data[DOMAIN].pop(entry.entry_id)
+        _LOGGER.info("Stopping Crow IP Module connection and releasing socket...")
+        try:
+            await hass.async_add_executor_job(controller.stop)
+        except Exception as e:
+            _LOGGER.error("Error stopping controller during unload: %s", e)
+
+    # Allow the OS and Crow IP module to cleanly release the single TCP socket
+    _LOGGER.debug("Waiting 2s for TCP socket release...")
+    await asyncio.sleep(2.0)
     return unload_ok
 
 # --- new: This function is reloading the integartion if something has changed in the options order to take the changes into account! ---

@@ -150,8 +150,9 @@ class CrowIPAlarmPanel():
         if self._client:
             _LOGGER.info("Disconnecting from the Crow IP Module...")
             self._client.stop()
+            self._client = None
         else:
-            _LOGGER.error(COMMAND_ERR)
+            _LOGGER.debug("Stop called but no active client.")
 
     def arm_away(self):
         """Public method to arm/stay a partition."""

@@ -55,7 +55,8 @@ async def async_setup_entry(
 
 
 class CrowBaseSwitch(SwitchEntity):
-    _attr_has_entity_name = True 
+    _attr_has_entity_name = True
+    _attr_should_poll = False 
 
     def __init__(self, controller, host, fw_version, fw_date):
         self._controller = controller

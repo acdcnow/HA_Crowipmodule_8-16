@@ -74,6 +74,7 @@ async def async_setup_entry(
 class CrowAlarmPanel(AlarmControlPanelEntity):
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_should_poll = False
 
     def __init__(self, controller, host, entry_id, area_number, name, code, code_required, fw_version, fw_date) -> None:
         self._controller = controller

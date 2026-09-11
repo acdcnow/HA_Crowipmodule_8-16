@@ -47,11 +47,12 @@ async def async_setup_entry(
             CrowAlarmZoneSensor(controller, host, i, f"{area_name} Last Alarm", fw_version, fw_date)
         )
 
-    async_add_entities(entities, True)
+    async_add_entities(entities, False)
 
 
 class CrowBaseTextSensor(SensorEntity):
     _attr_has_entity_name = True
+    _attr_should_poll = False
     
     def __init__(self, controller, host, fw_version, fw_date):
         self._controller = controller
